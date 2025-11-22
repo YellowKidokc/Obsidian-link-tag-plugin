@@ -5,6 +5,7 @@ const { TermScanner } = require('./scanner');
 const { ReviewQueueGenerator } = require('./review-queue');
 const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
+const { MathTranslatorCommand } = require('./math-translator-command');
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -13,6 +14,7 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.scanner = new TermScanner(this.app, this.settings);
     this.reviewQueue = new ReviewQueueGenerator(this.app, this.settings);
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
+    this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
 

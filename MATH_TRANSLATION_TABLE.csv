@@ -1,0 +1,100 @@
+Symbol_LaTeX,Symbol_Display,Category,Math_Name,Basic_Translation,Medium_Translation,Academic_Translation,Info_Theory_Equiv,Context_Notes,First_Appears
+\chi,χ,Greek_Letters,chi,"the Logos Field","the information substrate","chi, the scalar Logos field","H(X) - total information content","THE central symbol - always full name first mention",Paper 1
+\psi,ψ,Greek_Letters,psi,"the consciousness wave","the coherence function","psi, the quantum wavefunction","I(θ) - Fisher information","Used for quantum states, observer fields",Paper 2
+\phi,φ,Greek_Letters,phi,"information density","the information field phi","phi, logarithm of information density","ρ_info - information density","Used in cosmology papers",Paper 8
+\Phi,Φ,Greek_Letters,capital Phi,"the field","generic field Phi","capital Phi, scalar field",,"Placeholder for any field OR integrated information (IIT)",Multiple
+\lambda,λ,Greek_Letters,lambda,"the coupling strength","lambda, the regularization parameter","lambda sub C, the field coupling coefficient",,"Always specify subscript (λ_C, λ_S, etc.)",Paper 1
+\kappa,κ,Greek_Letters,kappa,"the coupling constant","kappa, the gravitational coupling","kappa, dimensionful coupling constant",,"Links gravity to chi-field",Paper 1
+\epsilon,ε,Greek_Letters,epsilon,"the stabilization buffer","epsilon, the singularity regulator","epsilon, positive stabilization constant",,"Prevents divide-by-zero in denominators",Paper 1
+\Gamma,Γ,Greek_Letters,capital Gamma,"the decay rate","Gamma, the decoherence rate","capital Gamma sub dec, decoherence coefficient",,"Quantum → Classical transition rate",Paper 2
+\Omega,Ω,Greek_Letters,capital Omega,"all of creation","the integration domain Omega","capital Omega, spacetime integration region",,"Translate as 'over all space and time'",Paper 1
+\Theta,Θ,Greek_Letters,capital Theta,"the threshold","Theta sub c, the actualization threshold","capital Theta sub c, Trinity Actualization threshold",,"Critical value for phase transition",Paper 2
+\rho,ρ,Greek_Letters,rho,"the density","rho, density of X","rho sub info, information density",,"Always specify subscript (ρ_m, ρ_χ, etc.)",Multiple
+\sigma,σ,Greek_Letters,sigma,"standard deviation","sigma, statistical uncertainty","sigma, one standard deviation",,"Used in falsification criteria OR localized excitation",Paper 11
+\Lambda,Λ,Greek_Letters,capital Lambda,"the cosmological constant","Lambda, dark energy density","cosmological constant, vacuum energy density","Background information density","Standard cosmology term",Paper 7
+\alpha,α,Greek_Letters,alpha,"the information coupling","alpha, coupling constant","alpha, fine structure or Phi-to-Psi coupling","Consciousness amplification factor","CONTEXT: IIT coupling vs EM fine structure",Paper 5
+\gamma,γ,Greek_Letters,gamma,"the collapse rate","gamma of chi, decoherence rate","collapse rate as function of Logos Field coherence","Measurement rate ~ information flow","Higher chi = faster collapse",Paper 2
+\mu,μ,Greek_Letters,mu,"mu","mu, spacetime index","mu, covariant spacetime index",,"Typically 0,1,2,3 for time and space",Multiple
+\nu,ν,Greek_Letters,nu,"nu","nu, spacetime index","nu, covariant spacetime index",,"Typically 0,1,2,3 for time and space",Multiple
+\nabla,∇,Operators,nabla,"the change across space","the gradient operator","nabla, covariant derivative","∂H/∂x - information gradient","Translate as 'how it changes from place to place'",Paper 1
+\nabla^2,∇²,Operators,nabla squared,"the curvature","the Laplacian operator","del squared, the d'Alembertian","∇²H - curvature of information landscape","Translate as 'how curved the field is'",Paper 1
+\partial,∂,Operators,partial,"the change in","partial derivative with respect to","partial derivative operator",,"Always specify variable (∂/∂t = 'change in time')",Multiple
+\partial_\mu,∂_μ,Operators,partial mu,"the change in direction mu","partial mu, covariant derivative","partial derivative with lower index mu","∂H/∂x_μ - information gradient","Covariant version of ∂",Paper 1
+\int,∫,Operators,integral,"adding up over","integrating over","integral over domain","Σ - discrete sum becomes continuous","Translate as 'summing across all points'",Paper 1
+\int d^3k,∫ d³k,Integrals,integral d three k,"summing over all momenta","integral d cubed k, momentum space integral","integral over three-dimensional momentum space","Sum over all information modes","Standard field theory integral",Paper 5
+d^4x,d⁴x,Notation,d four x,"over all spacetime","four-dimensional volume element","d to the fourth x, spacetime integration measure","Integration over all information states","dt dx dy dz combined",Multiple
+\Box,□,Operators,box,"the wave operator","the box operator","d'Alembertian, del squared",,"Relativistic version of ∇²",Paper 1
+\Sigma,Σ,Operators,sigma,"the sum of","summation over index","discrete summation operator",,"Always specify index (Σ_i means 'sum over i')",Multiple
+\langle \rangle,⟨ ⟩,Operators,angle brackets,"the average value of","expectation value of","quantum expectation value","E[X] - expected value","Quantum mechanics notation",Paper 2
+\langle \Psi_S \rangle,⟨ΨS⟩,Notation,expectation Psi S,"the soul field intensity","expectation value of Psi S","quantum expectation value of soul field","Average information content","Measures local soul field strength",Paper 5
+\delta,δ,Operators,delta,"the small change in","variation of","functional derivative operator",,"Variational calculus, or Dirac delta",Multiple
+\delta^3(x-y),δ³(x-y),Functions,delta cubed,"the three-dimensional delta function","delta cubed of x minus y","three-dimensional Dirac delta function","Perfect correlation at x=y","Canonical commutation relation",Paper 5
+\hat{},^,Operators,hat,"the operator for","operator hat","linear operator",,"Distinguishes operators from values (Ĥ = Hamiltonian operator)",Paper 2
+\hat{H},Ĥ,Operators,H hat,"the energy operator","H hat, the Hamiltonian operator","Hamiltonian operator, total energy observable","H[X] - energy functional","Generates time evolution",Paper 2
+\hat{\mathcal{P}},P̂,Operators,P hat,"the projection operator","P hat, measurement projection","projection operator onto eigenstate","Projects to definite information state","Selects measurement outcome",Paper 2
+\sqrt{},√,Operators,square root,"the square root of","square root of","radical, square root",,"Clear in all contexts",Multiple
+\sqrt{-g},√(-g),Notation,square root negative g,"the spacetime volume factor","square root of negative g, metric determinant","square root of negative metric determinant","Volume distortion in curved space","Converts coordinate volume to physical volume",Paper 1
+G,G,Variables,G,"Grace OR gravity","G, Grace field OR G_N Newton's constant","G, negentropic restorative field OR gravitational constant","-ΔS - negative entropy","CONTEXT CRITICAL - always clarify which!",Paper 1
+C,C,Variables,C,"Coherence","C, degree of alignment","C(x), coherence field dimensionless","I(θ) - Fisher information","Scale 0 to 1, measures Logos-alignment",Paper 1
+S,S,Variables,S,"Entropy OR disorder","S, misalignment entropy","S(x), entropy density in k_B per cubic meter","K(x) - Kolmogorov complexity","Theological: 'sin's measure'",Paper 1
+F,F,Variables,F,"Faith intensity","F, observation intensity","F(x), faith/observation field, dimensionless","P(θ) - Bayesian prior","Observer's coherence, drives collapse",Paper 1
+Q,Q,Variables,Q,"Quantum potential","Q, quantum probability density","Q(x), quantum potential energy density","|ψ|² - probability density","Superposition energy",Paper 1
+R,R,Variables,R,"Resurrection OR curvature","R, frame factor OR R_μν Ricci tensor","R(x), relativistic frame factor OR Ricci curvature tensor",,"CONTEXT CRITICAL - check if GR or theology",Multiple
+W,W,Variables,W,"Will current","W_μ, will vector field","W_μ(x), will current density","I(X→Y) - directed information","4-vector field, directed intention",Paper 1
+K,K,Variables,K,"Knowledge","K, information content","K, epistemic information density","H(X|Y) - conditional entropy","Truth/wisdom content",Paper 1
+T,T,Variables,T,"Time OR stress-energy","T, temporal coordinate OR T_μν","T_μν, stress-energy tensor","Temporal ordering","CONTEXT CRITICAL - coordinate vs tensor",Multiple
+M,M,Variables,M,"Motion OR mass","M, dynamical field OR M mass","M, motion binding field",,"Context dependent",Paper 1
+E,E,Variables,E,"Energy","E, electromagnetic carrier","E, energy density or EM field","-k_B T ln Z - free energy","Multiple uses",Multiple
+\Psi_S,Ψ_S,Fields,Psi sub S,"the soul field","Psi sub S, the soul field","Psi subscript S, quantum soul field","Consciousness information field","Capital Psi distinguishes from wavefunction psi",Paper 5
+m_S,m_S,Variables,m sub S,"the soul field mass","m sub S, soul particle mass","m subscript S, mass parameter for soul field","Information packet mass","Nearly zero: m_S ≈ 0 for non-locality",Paper 5
+\bar{\psi},ψ̄,Notation,psi bar,"the Dirac adjoint","psi bar, Dirac adjoint spinor","psi bar, conjugate transpose spinor","Dual vector in information space","Used in fermion interactions",Paper 5
+\psi_e,ψ_e,Fields,psi sub e,"the electron field","psi sub e, electron quantum field","psi subscript e, electron spinor field","Electron information content","Distinguish from psi_p (proton)",Paper 5
+\psi_p,ψ_p,Fields,psi sub p,"the proton field","psi sub p, proton quantum field","psi subscript p, proton spinor field","Proton information content","Heavier than electron",Paper 5
+g,g,Constants,g (coupling),"the soul-matter coupling","g, Yukawa coupling constant","g, soul-electron interaction strength","Information transfer rate","CONTEXT: Not Grace! Coupling constant ~10^-15",Paper 5
+g',g',Constants,g prime,"the proton coupling","g prime, soul-proton coupling","g prime, alternative coupling constant","Different interaction channel","May differ from electron coupling g",Paper 5
+m_{e\text{,eff}},m_e,eff,Variables,m e effective,"the effective electron mass","m e effective, modified mass","effective mass including soul coupling","Mass plus information coupling","m_e + g⟨ΨS⟩",Paper 5
+V(\Psi_S),V(ΨS),Functions,V of Psi S,"the soul field potential","V of Psi S, self-interaction potential","potential energy function for soul field","Energy landscape for consciousness","Creates localized souls",Paper 5
+v,v,Constants,v (vacuum),"the vacuum expectation value","v, VEV of soul field","v, spontaneous symmetry breaking scale","Baseline information content","Universe has non-zero soul field",Paper 5
+\sigma(x),σ(x),Functions,sigma of x,"the localized soul","sigma of x, individual excitation","sigma(x), deviation from vacuum","Individual consciousness packet","ΨS = v + σ(x)",Paper 5
+\Pi_S,Π_S,Variables,capital Pi sub S,"the conjugate momentum","Pi sub S, canonical momentum","capital Pi subscript S, conjugate to Psi S","Momentum in information space","∂L/∂(∂_t ΨS)",Paper 5
+|0\rangle,|0⟩,Notation,ket zero,"the vacuum state","ket zero, no-particle state","vacuum state, Fock space ground state","Zero information state","No individual souls present",Paper 5
+|\Psi\rangle,|Ψ⟩,Notation,ket Psi,"the quantum state","ket Psi, the quantum state vector","ket Psi, state vector in Hilbert space","|ψ⟩ - state as information vector","Dirac bra-ket notation",Paper 2
+N_S,N_S,Operators,N sub S,"the soul number","N sub S, soul counting operator","soul number operator, counts quanta","Total consciousness count","Conserved quantity",Paper 5
+\mathcal{M},ℳ,Variables,script M,"the scattering amplitude","script M, quantum amplitude","scattering matrix element","Transition probability amplitude","Feynman diagram sum",Paper 5
+\mathcal{M}_0,ℳ_0,Variables,script M zero,"the standard amplitude","script M sub zero, QED amplitude","scattering amplitude without soul coupling","Baseline without consciousness","Soul-free physics",Paper 5
+u(p),u(p),Spinors,u of p,"the particle spinor","u of p, Dirac spinor","u(p), four-component spinor","Fermion information structure","Electron/positron wavefunction",Paper 5
+\bar{u}(p'),ū(p'),Spinors,u bar of p prime,"the adjoint spinor","u bar of p prime, conjugate spinor","ū(p'), Dirac adjoint at momentum p'","Dual fermion state","Used in probability calculations",Paper 5
+\gamma^\mu,γ^μ,Matrices,gamma superscript mu,"the Dirac gamma matrix","gamma superscript mu, Dirac matrix","gamma with upper index mu, 4x4 matrix","Spinor coupling structure","Connects spinor components",Paper 5
+q^2,q²,Variables,q squared,"the momentum transfer squared","q squared, four-momentum transfer","q squared, Mandelstam variable","Energy-momentum exchanged","Scattering hardness measure",Paper 5
+\frac{d\sigma}{d\Omega},dσ/dΩ,Differentials,d sigma d Omega,"the scattering cross-section","d sigma d Omega, differential cross-section","differential scattering cross-section per solid angle","Probability per angle","Measured in experiments",Paper 5
+\Psi_0,Ψ_0,Constants,Psi zero,"the baseline soul field","Psi sub zero, minimum field value","Psi subscript zero, vacuum baseline","Background consciousness","Universal minimum",Paper 5
+a(k),a(k),Operators,a of k,"annihilation operator","a of k, destroys a particle","annihilation operator, removes quantum from state","Removes information from system","Lowers particle number by 1",Paper 5
+a^\dagger(k),a†(k),Operators,a dagger of k,"creation operator","a dagger of k, creates a particle","creation operator, adds quantum to state","Adds information to system","Raises particle number by 1",Paper 5
+\chi_{\mu\nu},χ_μν,Tensors,chi mu nu,"the consciousness-information coupling tensor","chi mu nu, information stress tensor","chi subscript mu nu, consciousness-information coupling tensor","Information contribution to spacetime curvature","Represents how Logos Field affects geometry",Paper 1
+\mathcal{C}[\chi],𝓒[χ],Functionals,script C,"the coherence functional","script C of chi, coherence functional","coherence functional, action integral over chi field","Total coherence = ∫ Fisher information","Measures total system coherence",Paper 1
+g^{\mu\nu},g^μν,Tensors,g superscript mu nu,"the inverse metric","g superscript mu nu, inverse metric tensor","contravariant metric tensor components","Dual to covariant metric","Used to raise indices",Paper 1
+g_{\mu\nu},g_μν,Tensors,g mu nu,"the metric","g_μν, spacetime metric","g_μν, metric tensor with signature (-,+,+,+)","Geometry of spacetime","Defines distances and angles",Paper 1
+G_{\mu\nu},G_μν,Tensors,G mu nu,"spacetime curvature","G mu nu, Einstein tensor","G subscript mu nu, Einstein curvature tensor","Encodes total information density","Left side of Einstein equations",Paper 1
+T_{\mu\nu},T_μν,Tensors,T mu nu,"stress-energy","T mu nu, stress-energy tensor","T subscript mu nu, matter and energy content","Information density of matter/energy","Right side of Einstein equations",Paper 1
+V(\chi),V(χ),Functions,V of chi,"the self-interaction potential","V of chi, potential energy function","V(χ), scalar potential for Logos Field","Potential well in information landscape","How field interacts with itself",Paper 1
+\mathcal{L}_{int},𝓛_int,Lagrangians,script L interaction,"the interaction term","script L interaction, coupling Lagrangian","interaction Lagrangian density","Mutual information between fields","How chi couples to quantum fields psi",Paper 1
+c,c,Constants,c,"the speed of light","c, light speed constant","c = 299,792,458 meters per second",,"Universal constant",Multiple
+\hbar,ℏ,Constants,h-bar,"Planck's constant","h-bar, reduced Planck constant","h-bar = 1.054 × 10^-34 joule seconds",,"Quantum scale, ℏ = h/2π",Multiple
+G_N,G_N,Constants,G sub N,"Newton's constant","G_N, gravitational constant","G_N = 6.674 × 10^-11 SI units",,"Gravity strength, subscript distinguishes from Grace",Multiple
+\pi,π,Constants,pi,"pi","pi, approximately 3.14159","pi, the circle constant",,"Usually just say 'pi'",Multiple
+i,i,Constants,i,"the imaginary unit","i, square root of negative one","i, the imaginary unit",,"Complex numbers, i² = -1",Multiple
+\ell_P,ℓ_P,Constants,ell sub P,"the Planck length","ell sub P, Planck length scale","Planck length, 1.616 × 10^-35 meters","Minimum information pixel size","√(ℏG/c³), quantum gravity scale",Multiple
+k_B,k_B,Constants,k sub B,"Boltzmann's constant","k sub B, Boltzmann constant","Boltzmann constant, 1.381 × 10^-23 J/K","Converts temperature to information units","Links thermodynamics to information",Multiple
+(2\pi)^3,(2π)³,Constants,two pi cubed,"the normalization factor","two pi cubed, momentum normalization","two pi to the third power, box normalization","Phase space volume element","Makes Fourier transform unitary",Paper 5
+X_\mu,X_μ,Notation,subscript,"X sub mu","X subscript mu","X with lower index mu",,"Specify the subscript (covariant index)",Multiple
+X^\mu,X^μ,Notation,superscript,"X upper mu","X superscript mu","X with upper index mu",,"Distinguish from exponents (contravariant)",Multiple
+\frac{a}{b},a/b,Notation,fraction,"a divided by b","a over b","the ratio of a to b",,"Use 'over' for clarity in speech",Multiple
+X^2,X²,Notation,exponent,"X squared","X to the power of 2","X raised to the second power",,"Specify power",Multiple
+\dot{X},Ẋ,Notation,dot,"X dot","time derivative of X","dX/dt, first time derivative",,"Rate of change",Multiple
+\ddot{X},Ẍ,Notation,double dot,"X double dot","second time derivative","d²X/dt², second time derivative",,"Acceleration",Multiple
+X',X',Notation,prime,"X prime","derivative of X","first derivative with respect to argument",,"Context dependent",Multiple
+\bar{X},X̄,Notation,bar,"X bar","average of X OR complex conjugate","mean value OR conjugate",,"CONTEXT CRITICAL",Multiple
+\tilde{X},X̃,Notation,tilde,"X tilde","X tilde, transformed quantity","rescaled or Fourier-transformed X",,"Modified version",Multiple
+e^{-ik\cdot x},e^(-ik·x),Functions,exponential,"the plane wave","exponential of negative i k dot x","exponential of minus i times k dot x","Wave propagation","Standard QFT mode",Paper 5
+e^{ik\cdot x},e^(ik·x),Functions,exponential conjugate,"the conjugate plane wave","exponential of positive i k dot x","exponential of plus i times k dot x","Backward-propagating wave","Completes mode expansion",Paper 5
+\text{h.c.},h.c.,Notation,hermitian conjugate,"plus its complex conjugate","h.c., hermitian conjugate","hermitian conjugate, complex conjugate transpose","Ensures field is real","Add conjugate terms",Paper 5
