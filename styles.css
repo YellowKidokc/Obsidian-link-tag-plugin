@@ -1,0 +1,25 @@
+/* Styles for Theophysics Research Automation plugin */
+
+.theophysics-review-queue h1 {
+  border-bottom: 2px solid var(--interactive-accent);
+  padding-bottom: 0.5em;
+}
+
+.theophysics-review-queue .confidence-high {
+  color: var(--text-accent);
+}
+
+.theophysics-review-queue .confidence-medium {
+  color: var(--text-muted);
+}
+
+.theophysics-review-queue .confidence-low {
+  color: var(--text-faint);
+}
+
+.theophysics-term-tag {
+  background: var(--background-secondary);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.9em;
+}
