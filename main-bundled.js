@@ -72,10 +72,12 @@ const DEFAULT_SETTINGS = {
   fetchExternalLinks: true,
   smartLinkDisplay: true,
   promptOnFirstView: true,
+  useAutoDetection: true,
+  useCustomTermsOnly: false,
   flagUndefined: true,
   showUsageCount: true,
   postgresSync: false,
-  minFrequency: 3,
+  minFrequency: 1,
   scanScope: 'global',
   scopedFolder: '',
   termPagesFolder: '_Term_Pages',
@@ -131,6 +133,31 @@ class TheophysicsSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.scopedFolder)
           .onChange(async (value) => {
             this.plugin.settings.scopedFolder = value;
+            await this.plugin.saveSettings();
+          }));
+    }
+
+    containerEl.createEl('h3', { text: 'Term Detection' });
+
+    new Setting(containerEl)
+      .setName('Use custom terms only')
+      .setDesc('Only search for terms from your custom terms file (faster, more precise)')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.useCustomTermsOnly)
+        .onChange(async (value) => {
+          this.plugin.settings.useCustomTermsOnly = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (!this.plugin.settings.useCustomTermsOnly) {
+      new Setting(containerEl)
+        .setName('Use auto-detection')
+        .setDesc('Automatically detect technical terms, equations, and patterns')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.useAutoDetection)
+          .onChange(async (value) => {
+            this.plugin.settings.useAutoDetection = value;
             await this.plugin.saveSettings();
           }));
     }
@@ -332,27 +359,83 @@ class TermScanner {
       .filter(line => line && !line.startsWith('#') && !line.startsWith('//') && !line.startsWith('---'));
   }
 
-  async scanFile(file, extraWhitelist) {
+  async scanFile(file, extraWhitelist, useAutoDetection) {
     const content = await this.app.vault.read(file);
-    const occurrences = detectTerms(content, extraWhitelist);
+    
+    let occurrences = [];
+    const lines = content.split('\n');
+
+    // 1. Run Regex Auto-Detection (if enabled)
+    if (useAutoDetection && !this.settings.useCustomTermsOnly) {
+      occurrences = detectTerms(content, extraWhitelist);
+    }
+
+    // 2. Explicitly Scan for Custom Terms + Built-in Whitelist
+    // We combine them to ensure we catch everything the user cares about
+    const termsToFind = [...new Set([...WHITELIST, ...extraWhitelist])];
+
+    lines.forEach((line, index) => {
+      if (!line.trim()) return;
+
+      termsToFind.forEach(term => {
+        if (!term) return;
+        
+        // Escape special characters for Regex
+        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Create regex to find the term (whole word, case insensitive)
+        const regex = new RegExp(`\\b${escapedTerm}\\b`, 'gi');
+        
+        const matches = line.matchAll(regex);
+        for (const match of matches) {
+          // Check if we already found this exact occurrence via auto-detection to avoid duplicates
+          const alreadyFound = occurrences.some(occ => 
+            occ.line === index + 1 && 
+            occ.term.toLowerCase() === term.toLowerCase()
+          );
+
+          if (!alreadyFound) {
+            occurrences.push({
+              term: match[0], // Use the actual text found (preserves case)
+              category: 'custom', // or 'whitelist'
+              line: index + 1,
+              context: line.trim(),
+              file: file.path
+            });
+          }
+        }
+      });
+    });
+    
     return occurrences.map(o => ({ ...o, file: file.path }));
   }
 
   async scanVault(customTerms = []) {
     let files = this.app.vault.getMarkdownFiles();
     
+    console.log('Total markdown files in vault:', files.length);
+    console.log('Custom terms loaded:', customTerms.length, customTerms.slice(0, 5));
+    
     // Filter by scope if local scanning is enabled
     if (this.settings.scanScope === 'local' && this.settings.scopedFolder) {
       const scopePath = this.settings.scopedFolder.replace(/\\/g, '/');
+      console.log('Filtering by scope path:', scopePath);
       files = files.filter(f => f.path.startsWith(scopePath));
+      console.log('Files after filtering:', files.length);
+      if (files.length > 0) {
+        console.log('Sample file paths:', files.slice(0, 3).map(f => f.path));
+      }
     }
     
     const whitelist = [...WHITELIST, ...customTerms];
     const allOccurrences = [];
     for (const file of files) {
-      const occurrences = await this.scanFile(file, whitelist);
+      const occurrences = await this.scanFile(file, customTerms, this.settings.useAutoDetection);
+      console.log(`Scanned ${file.path}: found ${occurrences.length} occurrences`);
       allOccurrences.push(...occurrences);
     }
+    
+    console.log('Total occurrences before frequency filter:', allOccurrences.length);
 
     const frequency = new Map();
     for (const occ of allOccurrences) {
