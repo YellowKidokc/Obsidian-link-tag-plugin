@@ -5,6 +5,7 @@ const { TermScanner } = require('./scanner');
 const { ReviewQueueGenerator } = require('./review-queue');
 const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
+const { MathTranslatorCommand } = require('./math-translator-command');
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -13,6 +14,7 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.scanner = new TermScanner(this.app, this.settings);
     this.reviewQueue = new ReviewQueueGenerator(this.app, this.settings);
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
+    this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
 
@@ -49,6 +51,30 @@ module.exports = class TheophysicsPlugin extends Plugin {
           await this.autoLinker.processFile(file, terms);
           new Notice('Auto-linking complete for current file');
         }
+      }
+    });
+
+    this.addCommand({
+      id: 'theophysics-translate-math-basic',
+      name: 'Translate Math to Words (Basic/Story)',
+      callback: async () => {
+        await this.mathTranslator.executeCommand('basic');
+      }
+    });
+
+    this.addCommand({
+      id: 'theophysics-translate-math-medium',
+      name: 'Translate Math to Words (Medium/Semi-Tech)',
+      callback: async () => {
+        await this.mathTranslator.executeCommand('medium');
+      }
+    });
+
+    this.addCommand({
+      id: 'theophysics-translate-math-academic',
+      name: 'Translate Math to Words (Academic/Precise)',
+      callback: async () => {
+        await this.mathTranslator.executeCommand('academic');
       }
     });
 
