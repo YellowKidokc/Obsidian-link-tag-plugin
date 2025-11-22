@@ -86,6 +86,29 @@ class TheophysicsSettingTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.runFullScan();
         }));
+
+    // Analytics Dashboards Section
+    containerEl.createEl('h3', { text: 'Analytics Dashboards' });
+
+    new Setting(containerEl)
+      .setName('Math Translation Dashboard')
+      .setDesc('Generate comprehensive analysis of mathematical symbols and equations across your vault')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateMathDashboard();
+        }));
+
+    new Setting(containerEl)
+      .setName('Theory Integration Dashboard')
+      .setDesc('Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness studies')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateTheoryDashboard();
+        }));
   }
 }
 
