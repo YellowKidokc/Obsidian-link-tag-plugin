@@ -80,6 +80,10 @@ const DEFAULT_SETTINGS = {
   minFrequency: 1,
   scanScope: 'global',
   scopedFolder: '',
+  excludedFolders: ['Assets', 'assets', '_Assets', '.obsidian', 'audio', 'Audio'],
+  analyticsLocation: 'local',
+  analyticsFolder: '_Data_Analytics',
+  globalAnalyticsFolder: '_Data_Analytics_Global',
   termPagesFolder: '_Term_Pages',
   customTerms: [],
   customTermsFile: 'Theophysics_Custom_Terms.md',
@@ -127,12 +131,103 @@ class TheophysicsSettingTab extends PluginSettingTab {
     if (this.plugin.settings.scanScope === 'local') {
       new Setting(containerEl)
         .setName('Scoped folder')
-        .setDesc('Folder path to scan (e.g., 03_PUBLICATIONS/COMPLETE_LOGOS_PAPERS_FINAL)')
+        .setDesc('Folder path to scan (relative to vault root, e.g., 03_PUBLICATIONS/COMPLETE_LOGOS_PAPERS_FINAL)')
         .addText(text => text
           .setPlaceholder('folder/path')
           .setValue(this.plugin.settings.scopedFolder)
           .onChange(async (value) => {
-            this.plugin.settings.scopedFolder = value;
+            // Clean up the path - remove vault root if present
+            let cleanPath = value.trim();
+            
+            // Remove absolute path prefix if user pasted it
+            const vaultPath = this.app.vault.adapter.basePath;
+            if (cleanPath.startsWith(vaultPath)) {
+              cleanPath = cleanPath.substring(vaultPath.length);
+            }
+            
+            // Remove leading/trailing slashes
+            cleanPath = cleanPath.replace(/^[\/\\]+|[\/\\]+$/g, '');
+            
+            // Convert backslashes to forward slashes
+            cleanPath = cleanPath.replace(/\\/g, '/');
+            
+            this.plugin.settings.scopedFolder = cleanPath;
+            await this.plugin.saveSettings();
+            
+            // Update the input to show cleaned path
+            text.setValue(cleanPath);
+          }))
+        .addButton(button => button
+          .setButtonText('Browse')
+          .onClick(async () => {
+            await this.plugin.browseFolders();
+          }));
+      
+      new Setting(containerEl)
+        .setDesc('💡 Tip: Right-click a folder in Obsidian → Copy path, then paste here. The plugin will auto-clean it.')
+        .setClass('setting-item-description');
+      
+      new Setting(containerEl)
+        .setName('Excluded folders')
+        .setDesc('Folders to skip during scanning (comma-separated, e.g., Assets, audio, images)')
+        .addTextArea(text => text
+          .setPlaceholder('Assets, audio, images')
+          .setValue(this.plugin.settings.excludedFolders.join(', '))
+          .onChange(async (value) => {
+            this.plugin.settings.excludedFolders = value
+              .split(',')
+              .map(f => f.trim())
+              .filter(f => f);
+            await this.plugin.saveSettings();
+          }))
+        .addButton(button => button
+          .setButtonText('Reset')
+          .onClick(async () => {
+            this.plugin.settings.excludedFolders = DEFAULT_SETTINGS.excludedFolders;
+            await this.plugin.saveSettings();
+            this.display();
+            new Notice('Exclusions reset to defaults');
+          }));
+    }
+
+    containerEl.createEl('h3', { text: 'Analytics Output' });
+
+    new Setting(containerEl)
+      .setName('Analytics location')
+      .setDesc('Where to save term analysis pages')
+      .addDropdown(dropdown => dropdown
+        .addOption('local', 'Local (inside scanned folder)')
+        .addOption('global', 'Global (vault root)')
+        .addOption('both', 'Both (local + aggregated global)')
+        .setValue(this.plugin.settings.analyticsLocation)
+        .onChange(async (value) => {
+          this.plugin.settings.analyticsLocation = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.analyticsLocation === 'local' || this.plugin.settings.analyticsLocation === 'both') {
+      new Setting(containerEl)
+        .setName('Local analytics folder name')
+        .setDesc('Folder name created inside each scanned location')
+        .addText(text => text
+          .setPlaceholder('_Data_Analytics')
+          .setValue(this.plugin.settings.analyticsFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.analyticsFolder = value || '_Data_Analytics';
+            await this.plugin.saveSettings();
+          }));
+    }
+
+    if (this.plugin.settings.analyticsLocation === 'global' || this.plugin.settings.analyticsLocation === 'both') {
+      new Setting(containerEl)
+        .setName('Global analytics folder name')
+        .setDesc('Folder name in vault root for aggregated analysis')
+        .addText(text => text
+          .setPlaceholder('_Data_Analytics_Global')
+          .setValue(this.plugin.settings.globalAnalyticsFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.globalAnalyticsFolder = value || '_Data_Analytics_Global';
             await this.plugin.saveSettings();
           }));
     }
@@ -352,11 +447,25 @@ class TermScanner {
 
   async loadCustomTerms() {
     const file = this.app.vault.getAbstractFileByPath(this.settings.customTermsFile);
-    if (!file) return [];
+    console.log('Looking for custom terms file:', this.settings.customTermsFile);
+    console.log('File found:', !!file);
+    
+    if (!file) {
+      console.error('Custom terms file not found at:', this.settings.customTermsFile);
+      return [];
+    }
+    
     const content = await this.app.vault.read(file);
-    return content.split('\n')
+    console.log('File content length:', content.length);
+    
+    const terms = content.split('\n')
       .map(line => line.trim())
       .filter(line => line && !line.startsWith('#') && !line.startsWith('//') && !line.startsWith('---'));
+    
+    console.log('Parsed terms:', terms.length);
+    console.log('First 10 terms:', terms.slice(0, 10));
+    
+    return terms;
   }
 
   async scanFile(file, extraWhitelist, useAutoDetection) {
@@ -425,6 +534,20 @@ class TermScanner {
       if (files.length > 0) {
         console.log('Sample file paths:', files.slice(0, 3).map(f => f.path));
       }
+    }
+    
+    // Filter out excluded folders
+    if (this.settings.excludedFolders && this.settings.excludedFolders.length > 0) {
+      const beforeExclusion = files.length;
+      files = files.filter(f => {
+        const path = f.path.toLowerCase();
+        return !this.settings.excludedFolders.some(excluded => 
+          path.includes('/' + excluded.toLowerCase() + '/') || 
+          path.startsWith(excluded.toLowerCase() + '/')
+        );
+      });
+      console.log(`Excluded folders filter: ${beforeExclusion} -> ${files.length} files`);
+      console.log('Excluded folders:', this.settings.excludedFolders);
     }
     
     const whitelist = [...WHITELIST, ...customTerms];
@@ -657,12 +780,30 @@ class TermPageGenerator {
     this.linkFetcher = linkFetcher;
   }
 
-  async ensureTermPagesFolder() {
-    const folder = this.settings.termPagesFolder;
+  getAnalyticsFolderPath() {
+    const location = this.settings.analyticsLocation;
+    
+    if (location === 'global') {
+      return this.settings.globalAnalyticsFolder;
+    } else if (location === 'local' && this.settings.scanScope === 'local' && this.settings.scopedFolder) {
+      // Local: inside the scanned folder
+      return `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`;
+    } else if (location === 'both' && this.settings.scanScope === 'local' && this.settings.scopedFolder) {
+      // For 'both', return local path (global will be handled separately)
+      return `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`;
+    } else {
+      // Fallback to global
+      return this.settings.globalAnalyticsFolder;
+    }
+  }
+
+  async ensureTermPagesFolder(folderPath = null) {
+    const folder = folderPath || this.getAnalyticsFolderPath();
     const exists = this.app.vault.getAbstractFileByPath(folder);
     if (!exists) {
       await this.app.vault.createFolder(folder);
     }
+    return folder;
   }
 
   sanitizeFilename(term) {
@@ -700,12 +841,12 @@ class TermPageGenerator {
     this.settings.linkPreferences[term] = showLinks;
   }
 
-  async generateTermPage(termData) {
-    await this.ensureTermPagesFolder();
+  async generateTermPage(termData, targetFolder = null) {
+    const folder = await this.ensureTermPagesFolder(targetFolder);
     
     const { term, count, files, occurrences } = termData;
     const filename = this.sanitizeFilename(term);
-    const filepath = `${this.settings.termPagesFolder}/${filename}.md`;
+    const filepath = `${folder}/${filename}.md`;
     
     // Check if page already exists
     const existingFile = this.app.vault.getAbstractFileByPath(filepath);
@@ -786,12 +927,33 @@ class TermPageGenerator {
     const { terms } = scanResult;
     const generated = [];
     
-    for (const termData of terms) {
-      try {
-        const filepath = await this.generateTermPage(termData);
-        generated.push(filepath);
-      } catch (error) {
-        console.error(`Failed to generate page for ${termData.term}:`, error);
+    // Generate local analytics
+    if (this.settings.analyticsLocation === 'local' || this.settings.analyticsLocation === 'both') {
+      const localFolder = this.settings.scanScope === 'local' && this.settings.scopedFolder
+        ? `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`
+        : this.settings.analyticsFolder;
+      
+      for (const termData of terms) {
+        try {
+          const filepath = await this.generateTermPage(termData, localFolder);
+          generated.push(filepath);
+        } catch (error) {
+          console.error(`Failed to generate local page for ${termData.term}:`, error);
+        }
+      }
+    }
+    
+    // Generate global analytics (if 'both' or 'global')
+    if (this.settings.analyticsLocation === 'global' || this.settings.analyticsLocation === 'both') {
+      const globalFolder = this.settings.globalAnalyticsFolder;
+      
+      for (const termData of terms) {
+        try {
+          const filepath = await this.generateTermPage(termData, globalFolder);
+          generated.push(filepath);
+        } catch (error) {
+          console.error(`Failed to generate global page for ${termData.term}:`, error);
+        }
       }
     }
     
@@ -1053,6 +1215,15 @@ unitarity principle
     new Notice(`External links for "${term}" ${!current ? 'enabled' : 'disabled'}`);
   }
 
+  async browseFolders() {
+    const modal = new FolderPickerModal(this.app, this, (folder) => {
+      this.settings.scopedFolder = folder;
+      this.saveSettings();
+      new Notice(`Folder set to: ${folder}`);
+    });
+    modal.open();
+  }
+
   async clearTermPages() {
     const folder = this.settings.termPagesFolder;
     const folderObj = this.app.vault.getAbstractFileByPath(folder);
@@ -1083,9 +1254,40 @@ unitarity principle
   }
 };
 
-// ===== LINK PREFERENCE MODAL =====
-const { Modal } = require('obsidian');
+// ===== FOLDER PICKER MODAL =====
+const { Modal, FuzzySuggestModal } = require('obsidian');
 
+class FolderPickerModal extends FuzzySuggestModal {
+  constructor(app, plugin, onChoose) {
+    super(app);
+    this.plugin = plugin;
+    this.onChooseCallback = onChoose;
+  }
+
+  getItems() {
+    // Get all folders in the vault
+    const folders = [];
+    const allFiles = this.app.vault.getAllLoadedFiles();
+    
+    for (const file of allFiles) {
+      if (file.children) { // It's a folder
+        folders.push(file.path);
+      }
+    }
+    
+    return folders.sort();
+  }
+
+  getItemText(folder) {
+    return folder;
+  }
+
+  onChooseItem(folder, evt) {
+    this.onChooseCallback(folder);
+  }
+}
+
+// ===== LINK PREFERENCE MODAL =====
 class LinkPreferenceModal extends Modal {
   constructor(app, plugin, preferences) {
     super(app);
