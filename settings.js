@@ -63,7 +63,11 @@ const DEFAULT_SETTINGS = {
   analyticsFolder: 'Data Analytics',
   trackKeywords: true,
   trackTags: true,
-  minTagFrequency: 2
+  minTagFrequency: 2,
+  // AI Integration
+  aiEnabled: false,
+  aiConfidence: 0.7,
+  aiAutoUpdate: false
 };
 
 class TheophysicsSettingTab extends PluginSettingTab {
@@ -477,21 +481,95 @@ class TheophysicsSettingTab extends PluginSettingTab {
         }));
 
     // =================================================================
-    // AI FEATURES (PLACEHOLDER)
+    // AI INTEGRATION LAYER
     // =================================================================
-    containerEl.createEl('h2', { text: '🤖 AI Features' });
+    containerEl.createEl('h2', { text: '🤖 AI Integration Layer' });
 
     containerEl.createEl('p', {
-      text: 'AI-powered features coming soon. This section will include automated analysis, suggestions, and integrations.',
+      text: 'Smart assistant that reads your papers and automatically finds missing symbols, theories, and keywords to enhance your dashboards.',
       cls: 'setting-item-description'
     });
 
     new Setting(containerEl)
-      .setName('AI Analysis')
-      .setDesc('Future: AI-powered term detection and analysis')
-      .addButton(button => button
-        .setButtonText('Coming Soon')
-        .setDisabled(true));
+      .setName('Enable AI integration')
+      .setDesc('Allow AI to analyze your vault and suggest improvements to tracking lists')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.aiEnabled || false)
+        .onChange(async (value) => {
+          this.plugin.settings.aiEnabled = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.aiEnabled) {
+      containerEl.createEl('h3', { text: '🔍 AI Analysis Actions' });
+
+      new Setting(containerEl)
+        .setName('Analyze current file')
+        .setDesc('AI scans current file for missing symbols, theories, and keywords')
+        .addButton(button => button
+          .setButtonText('Analyze File')
+          .setCta()
+          .onClick(async () => {
+            const view = this.plugin.app.workspace.getActiveViewOfType(require('obsidian').MarkdownView);
+            if (view && view.file) {
+              await this.plugin.aiAnalyzeFile(view.file);
+            } else {
+              new (require('obsidian').Notice)('No file open');
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Analyze entire vault')
+        .setDesc('AI scans all files and generates comprehensive enhancement report')
+        .addButton(button => button
+          .setButtonText('Analyze Vault')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.aiAnalyzeVault();
+          }));
+
+      new Setting(containerEl)
+        .setName('Enhance all dashboards')
+        .setDesc('Run AI analysis then regenerate all dashboards with findings')
+        .addButton(button => button
+          .setButtonText('Enhance All')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.aiEnhanceAll();
+          }));
+
+      containerEl.createEl('h3', { text: '⚙️ AI Configuration' });
+
+      containerEl.createEl('p', {
+        text: 'Configure how AI identifies and categorizes new discoveries.',
+        cls: 'setting-item-description'
+      });
+
+      new Setting(containerEl)
+        .setName('Detection confidence')
+        .setDesc('Minimum confidence (0.0-1.0) for AI to suggest new items')
+        .addText(text => text
+          .setPlaceholder('0.7')
+          .setValue(String(this.plugin.settings.aiConfidence || 0.7))
+          .onChange(async (value) => {
+            const num = parseFloat(value);
+            if (!isNaN(num) && num >= 0 && num <= 1) {
+              this.plugin.settings.aiConfidence = num;
+              await this.plugin.saveSettings();
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Auto-update tracking lists')
+        .setDesc('Automatically add AI discoveries to tracking lists (experimental)')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.aiAutoUpdate || false)
+          .onChange(async (value) => {
+            this.plugin.settings.aiAutoUpdate = value;
+            await this.plugin.saveSettings();
+          }));
+    }
   }
 }
 

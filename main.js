@@ -6,6 +6,7 @@ const { ReviewQueueGenerator } = require('./review-queue');
 const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
 const { MathTranslatorCommand } = require('./math-translator-command');
+const { AIIntegration } = require('./ai-integration');
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -15,6 +16,7 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.reviewQueue = new ReviewQueueGenerator(this.app, this.settings);
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
     this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
+    this.aiIntegration = new AIIntegration(this.app, this.settings);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
 
@@ -70,6 +72,29 @@ module.exports = class TheophysicsPlugin extends Plugin {
       id: 'theophysics-keyword-dashboard',
       name: 'Generate Keyword & Tag Analytics Dashboard',
       callback: async () => await this.generateKeywordDashboard()
+    });
+
+    // AI Integration Commands
+    this.addCommand({
+      id: 'theophysics-ai-analyze-current',
+      name: 'AI: Analyze Current File',
+      editorCallback: async (editor, view) => {
+        if (view.file) {
+          await this.aiAnalyzeFile(view.file);
+        }
+      }
+    });
+
+    this.addCommand({
+      id: 'theophysics-ai-analyze-vault',
+      name: 'AI: Analyze Entire Vault',
+      callback: async () => await this.aiAnalyzeVault()
+    });
+
+    this.addCommand({
+      id: 'theophysics-ai-enhance-dashboards',
+      name: 'AI: Enhance All Dashboards',
+      callback: async () => await this.aiEnhanceAll()
     });
 
     this.app.workspace.onLayoutReady(async () => {
@@ -563,5 +588,104 @@ Core concepts not yet referenced:\n\n`;
     const folderPath = await this.ensureDataAnalyticsFolder();
     const filePath = await this.saveDashboard(folderPath, 'KEYWORD_TAG_ANALYTICS_DASHBOARD.md', md);
     new Notice(`Keyword Dashboard saved to ${filePath}`);
+  }
+
+  // ==============================================================
+  // AI INTEGRATION METHODS
+  // ==============================================================
+
+  async aiAnalyzeFile(file) {
+    new Notice('AI: Starting analysis...');
+
+    // Get current tracking lists
+    const currentTracking = {
+      symbols: [
+        'χ', 'ψ', 'Ψ', 'φ', 'Φ', 'θ', 'Θ', 'λ', 'Λ', 'μ', 'ν', 'ρ', 'σ', 'Σ', 'τ', 'ω', 'Ω',
+        'α', 'β', 'γ', 'Γ', 'δ', 'Δ', 'ε', 'ζ', 'η', 'κ', 'π', 'ξ', 'Ξ',
+        '∇', '∂', '∫', '∑', '∏', '√', '∞', '≈', '≠', '≤', '≥', '±', '∈', '∉', '⊂', '⊃', '∪', '∩',
+        'ℏ', 'ℝ', 'ℂ', 'ℕ', 'ℤ', 'ℚ'
+      ],
+      theories: [
+        'General Relativity', 'Special Relativity', 'Quantum Mechanics',
+        'Copenhagen Interpretation', 'Many-Worlds Interpretation',
+        'String Theory', 'Loop Quantum Gravity', 'Nicene Creed',
+        'Logos Theology', 'Trinity', 'Information Theory', 'IIT'
+      ],
+      keywords: [
+        'consciousness', 'quantum', 'observer', 'trinity', 'logos', 'pneuma'
+      ]
+    };
+
+    const results = await this.aiIntegration.analyzeFile(file, currentTracking);
+
+    // Generate report
+    const report = this.aiIntegration.generateEnhancementReport({
+      totalFiles: 1,
+      math: results.math,
+      theories: results.theories,
+      keywords: results.keywords
+    });
+
+    const folderPath = await this.ensureDataAnalyticsFolder();
+    const reportPath = await this.saveDashboard(
+      folderPath,
+      `AI_ANALYSIS_${file.basename.replace(/\.md$/, '')}.md`,
+      report
+    );
+
+    new Notice(`AI: Analysis complete! Report saved to ${reportPath}`);
+  }
+
+  async aiAnalyzeVault() {
+    new Notice('AI: Starting vault-wide analysis... This may take a while.');
+
+    const files = this.app.vault.getMarkdownFiles();
+
+    // Get current tracking lists (same as above)
+    const currentTracking = {
+      symbols: [
+        'χ', 'ψ', 'Ψ', 'φ', 'Φ', 'θ', 'Θ', 'λ', 'Λ', 'μ', 'ν', 'ρ', 'σ', 'Σ', 'τ', 'ω', 'Ω',
+        'α', 'β', 'γ', 'Γ', 'δ', 'Δ', 'ε', 'ζ', 'η', 'κ', 'π', 'ξ', 'Ξ',
+        '∇', '∂', '∫', '∑', '∏', '√', '∞', '≈', '≠', '≤', '≥', '±', '∈', '∉', '⊂', '⊃', '∪', '∩',
+        'ℏ', 'ℝ', 'ℂ', 'ℕ', 'ℤ', 'ℚ'
+      ],
+      theories: [
+        'General Relativity', 'Special Relativity', 'Quantum Mechanics',
+        'Copenhagen Interpretation', 'Many-Worlds Interpretation',
+        'String Theory', 'Loop Quantum Gravity', 'Nicene Creed',
+        'Logos Theology', 'Trinity', 'Information Theory', 'IIT'
+      ],
+      keywords: [
+        'consciousness', 'quantum', 'observer', 'trinity', 'logos', 'pneuma'
+      ]
+    };
+
+    const results = await this.aiIntegration.analyzeVault(files, currentTracking);
+
+    // Generate report
+    const report = this.aiIntegration.generateEnhancementReport(results);
+
+    const folderPath = await this.ensureDataAnalyticsFolder();
+    const reportPath = await this.saveDashboard(
+      folderPath,
+      'AI_VAULT_ANALYSIS.md',
+      report
+    );
+
+    new Notice(`AI: Vault analysis complete! Found ${results.math.symbols.length} new symbols, ${results.theories.theories.length} new theories, ${results.keywords.keywords.length} new keywords`);
+  }
+
+  async aiEnhanceAll() {
+    new Notice('AI: Enhancing all dashboards...');
+
+    // First analyze vault
+    await this.aiAnalyzeVault();
+
+    // Then regenerate all dashboards
+    await this.generateMathDashboard();
+    await this.generateTheoryDashboard();
+    await this.generateKeywordDashboard();
+
+    new Notice('AI: All dashboards enhanced!');
   }
 };
