@@ -66,6 +66,12 @@ module.exports = class TheophysicsPlugin extends Plugin {
       callback: async () => await this.generateTheoryDashboard()
     });
 
+    this.addCommand({
+      id: 'theophysics-keyword-dashboard',
+      name: 'Generate Keyword & Tag Analytics Dashboard',
+      callback: async () => await this.generateKeywordDashboard()
+    });
+
     this.app.workspace.onLayoutReady(async () => {
       await this.ensureCustomTermsFile();
       await this.glossaryManager.ensureGlossaryExists();
@@ -114,17 +120,18 @@ module.exports = class TheophysicsPlugin extends Plugin {
   // HELPER: Find or Create Data Analytics Folder
   // ==============================================================
   async ensureDataAnalyticsFolder() {
+    const targetName = this.settings.analyticsFolder || 'Data Analytics';
+
     // Search for existing folder (case-insensitive)
     const folders = this.app.vault.getAllLoadedFiles().filter(f => f.children);
     let analyticsFolder = folders.find(f =>
-      f.name.toLowerCase() === 'data analytics' ||
-      f.name.toLowerCase() === 'data analyst'
+      f.name.toLowerCase() === targetName.toLowerCase()
     );
 
     if (!analyticsFolder) {
       // Create it at root
-      await this.app.vault.createFolder('Data Analytics');
-      analyticsFolder = this.app.vault.getAbstractFileByPath('Data Analytics');
+      await this.app.vault.createFolder(targetName);
+      analyticsFolder = this.app.vault.getAbstractFileByPath(targetName);
     }
 
     return analyticsFolder.path;
@@ -376,5 +383,185 @@ updated: ${new Date().toISOString()}
     const folderPath = await this.ensureDataAnalyticsFolder();
     const filePath = await this.saveDashboard(folderPath, 'THEORY_INTEGRATION_DASHBOARD.md', md);
     new Notice(`Theory Dashboard saved to ${filePath}`);
+  }
+
+  // ==============================================================
+  // KEYWORD & TAG ANALYTICS DASHBOARD
+  // ==============================================================
+  async generateKeywordDashboard() {
+    new Notice('Generating Keyword & Tag Analytics Dashboard...');
+
+    const files = this.app.vault.getMarkdownFiles();
+    const tagCounts = {};
+    const keywordCounts = {};
+    const taggedFiles = {};
+
+    // Common keywords to track (theophysics-specific)
+    const importantKeywords = [
+      'consciousness', 'quantum', 'observer', 'measurement', 'entanglement',
+      'trinity', 'logos', 'pneuma', 'christ', 'spirit', 'god',
+      'information', 'entropy', 'coherence', 'decoherence', 'superposition',
+      'wave function', 'collapse', 'resurrection', 'incarnation', 'creation',
+      'time', 'space', 'dimension', 'field', 'particle', 'energy',
+      'free will', 'determinism', 'causality', 'emergence', 'complexity'
+    ];
+
+    // Scan files
+    for (const file of files) {
+      const content = await this.app.vault.read(file);
+      const cache = this.app.metadataCache.getFileCache(file);
+
+      // Track tags
+      if (cache?.tags) {
+        cache.tags.forEach(tagRef => {
+          const tag = tagRef.tag;
+          if (!tagCounts[tag]) {
+            tagCounts[tag] = 0;
+            taggedFiles[tag] = new Set();
+          }
+          tagCounts[tag]++;
+          taggedFiles[tag].add(file.basename);
+        });
+      }
+
+      // Track frontmatter tags
+      if (cache?.frontmatter?.tags) {
+        const fmTags = Array.isArray(cache.frontmatter.tags)
+          ? cache.frontmatter.tags
+          : [cache.frontmatter.tags];
+
+        fmTags.forEach(tag => {
+          const fullTag = tag.startsWith('#') ? tag : `#${tag}`;
+          if (!tagCounts[fullTag]) {
+            tagCounts[fullTag] = 0;
+            taggedFiles[fullTag] = new Set();
+          }
+          tagCounts[fullTag]++;
+          taggedFiles[fullTag].add(file.basename);
+        });
+      }
+
+      // Track keywords
+      const lowerContent = content.toLowerCase();
+      importantKeywords.forEach(keyword => {
+        const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'gi');
+        const matches = content.match(regex);
+        if (matches) {
+          if (!keywordCounts[keyword]) keywordCounts[keyword] = 0;
+          keywordCounts[keyword] += matches.length;
+        }
+      });
+    }
+
+    // Filter by minimum frequency
+    const minFreq = this.settings.minTagFrequency || 2;
+    const filteredTags = Object.entries(tagCounts)
+      .filter(([, count]) => count >= minFreq)
+      .sort(([, a], [, b]) => b - a);
+
+    const sortedKeywords = Object.entries(keywordCounts)
+      .filter(([, count]) => count > 0)
+      .sort(([, a], [, b]) => b - a);
+
+    // Calculate metrics
+    const totalTags = filteredTags.length;
+    const totalKeywordOccurrences = sortedKeywords.reduce((a, b) => a + b[1], 0);
+    const avgTagsPerFile = (Object.values(tagCounts).reduce((a, b) => a + b, 0) / files.length).toFixed(2);
+
+    // Generate markdown
+    let md = `---
+cssclass: dashboard
+tags: [dashboard, keywords, analytics]
+updated: ${new Date().toISOString()}
+---
+
+# 🏷️ Keyword & Tag Analytics Dashboard
+
+> **Semantic Map** of your research vault's terminology and organization
+
+## 📊 Overview
+
+| Metric | Value |
+|:-------|------:|
+| **Total Unique Tags** | ${totalTags} |
+| **Total Keyword Occurrences** | ${totalKeywordOccurrences} |
+| **Avg Tags per File** | ${avgTagsPerFile} |
+| **Files Scanned** | ${files.length} |
+
+## 🏆 Top Tags
+
+| Rank | Tag | Count | Files | Status |
+|:----:|:----|------:|------:|:-------|
+`;
+
+    filteredTags.slice(0, 30).forEach(([tag, count], index) => {
+      const fileCount = taggedFiles[tag].size;
+      const status = count > 50 ? '🟢 Core' : count > 10 ? '🟡 Common' : '⚪ Used';
+      md += `| ${index + 1} | \`${tag}\` | ${count} | ${fileCount} | ${status} |\n`;
+    });
+
+    if (filteredTags.length > 30) {
+      md += `\n*...and ${filteredTags.length - 30} more tags.*\n`;
+    }
+
+    // Keyword frequency
+    md += `\n## 📖 Keyword Frequency
+
+Tracking ${importantKeywords.length} core theophysics concepts:
+
+| Rank | Keyword | Occurrences | Density |
+|:----:|:--------|------------:|:--------|
+`;
+
+    sortedKeywords.slice(0, 40).forEach(([keyword, count], index) => {
+      const density = ((count / files.length)).toFixed(2);
+      md += `| ${index + 1} | **${keyword}** | ${count} | ${density}/file |\n`;
+    });
+
+    // Tag categories (auto-detect by prefix)
+    md += `\n## 🗂️ Tag Categories
+
+Auto-detected tag groupings:
+
+`;
+
+    const categories = {};
+    filteredTags.forEach(([tag]) => {
+      const parts = tag.split('/');
+      if (parts.length > 1) {
+        const category = parts[0];
+        if (!categories[category]) categories[category] = [];
+        categories[category].push(tag);
+      }
+    });
+
+    if (Object.keys(categories).length > 0) {
+      for (const [category, tags] of Object.entries(categories)) {
+        md += `\n### ${category}\n`;
+        tags.forEach(tag => {
+          md += `- \`${tag}\` (${tagCounts[tag]} occurrences)\n`;
+        });
+      }
+    } else {
+      md += `No hierarchical tags found. Consider using \`#category/subcategory\` structure for better organization.\n`;
+    }
+
+    // Missing keywords
+    const missingKeywords = importantKeywords.filter(k => !keywordCounts[k] || keywordCounts[k] === 0);
+    md += `\n## ⚠️ Missing Concepts
+
+Core concepts not yet referenced:\n\n`;
+
+    if (missingKeywords.length > 0) {
+      missingKeywords.forEach(k => md += `- [ ] ${k}\n`);
+    } else {
+      md += `✅ All core concepts have been discussed!\n`;
+    }
+
+    md += `\n---\n*Generated: ${new Date().toLocaleString()}*\n`;
+
+    const folderPath = await this.ensureDataAnalyticsFolder();
+    const filePath = await this.saveDashboard(folderPath, 'KEYWORD_TAG_ANALYTICS_DASHBOARD.md', md);
+    new Notice(`Keyword Dashboard saved to ${filePath}`);
   }
 };

@@ -18,8 +18,8 @@ class AutoLinker {
   }
 
   isLinked(line, term) {
-    const pattern = new RegExp(`\\[\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\\\]`, 'i');
-    const mdPattern = new RegExp(`\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\]\([^)]+\)`, 'i');
+    const pattern = new RegExp(`\\[\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\]\\]`, 'i');
+    const mdPattern = new RegExp(`\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\]\\([^)]+\\)`, 'i');
     return pattern.test(line) || mdPattern.test(line);
   }
 

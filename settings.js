@@ -58,7 +58,12 @@ const DEFAULT_SETTINGS = {
   showUsageCount: true,
   postgresSync: false,
   whitelist: [],
-  blacklist: []
+  blacklist: [],
+  // New analytics settings
+  analyticsFolder: 'Data Analytics',
+  trackKeywords: true,
+  trackTags: true,
+  minTagFrequency: 2
 };
 
 class TheophysicsSettingTab extends PluginSettingTab {
@@ -70,7 +75,12 @@ class TheophysicsSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl('h2', { text: 'Theophysics Research Automation Settings' });
+    containerEl.createEl('h1', { text: 'Theophysics Research Automation' });
+
+    // =================================================================
+    // GENERAL SETTINGS
+    // =================================================================
+    containerEl.createEl('h2', { text: '⚙️ General Settings' });
 
     // ===== GENERAL SETTINGS =====
     containerEl.createEl('h3', { text: '⚙️ General Settings' });
@@ -366,12 +376,79 @@ class TheophysicsSettingTab extends PluginSettingTab {
           await this.plugin.runFullScan();
         }));
 
-    // Analytics Dashboards Section
-    containerEl.createEl('h3', { text: 'Analytics Dashboards' });
+    // =================================================================
+    // DATA ANALYTICS & KEYWORDS
+    // =================================================================
+    containerEl.createEl('h2', { text: '📊 Data Analytics & Keywords' });
+
+    new Setting(containerEl)
+      .setName('Analytics folder')
+      .setDesc('Folder where all dashboards will be saved (auto-created if missing)')
+      .addText(text => text
+        .setPlaceholder('Data Analytics')
+        .setValue(this.plugin.settings.analyticsFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.analyticsFolder = value || DEFAULT_SETTINGS.analyticsFolder;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Track keywords')
+      .setDesc('Enable keyword frequency tracking across vault')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.trackKeywords)
+        .onChange(async (value) => {
+          this.plugin.settings.trackKeywords = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Track tags')
+      .setDesc('Enable tag analytics and frequency tracking')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.trackTags)
+        .onChange(async (value) => {
+          this.plugin.settings.trackTags = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Minimum tag frequency')
+      .setDesc('Only show tags that appear at least this many times')
+      .addText(text => text
+        .setPlaceholder('2')
+        .setValue(String(this.plugin.settings.minTagFrequency))
+        .onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.minTagFrequency = num;
+            await this.plugin.saveSettings();
+          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Keyword & Tag Analytics Dashboard')
+      .setDesc('Generate comprehensive tag and keyword frequency analysis')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateKeywordDashboard();
+        }));
+
+    // =================================================================
+    // MATH TRANSLATION
+    // =================================================================
+    containerEl.createEl('h2', { text: '🔣 Math Translation' });
+
+    containerEl.createEl('p', {
+      text: 'Track mathematical symbols and equations across your vault.',
+      cls: 'setting-item-description'
+    });
 
     new Setting(containerEl)
       .setName('Math Translation Dashboard')
-      .setDesc('Generate comprehensive analysis of mathematical symbols and equations across your vault')
+      .setDesc('Generate comprehensive analysis of mathematical symbols and equations')
       .addButton(button => button
         .setButtonText('Generate Dashboard')
         .setCta()
@@ -379,15 +456,42 @@ class TheophysicsSettingTab extends PluginSettingTab {
           await this.plugin.generateMathDashboard();
         }));
 
+    // =================================================================
+    // THEORY INTEGRATION
+    // =================================================================
+    containerEl.createEl('h2', { text: '📚 Theory Integration' });
+
+    containerEl.createEl('p', {
+      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness.',
+      cls: 'setting-item-description'
+    });
+
     new Setting(containerEl)
       .setName('Theory Integration Dashboard')
-      .setDesc('Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness studies')
+      .setDesc('Track framework references and integration metrics')
       .addButton(button => button
         .setButtonText('Generate Dashboard')
         .setCta()
         .onClick(async () => {
           await this.plugin.generateTheoryDashboard();
         }));
+
+    // =================================================================
+    // AI FEATURES (PLACEHOLDER)
+    // =================================================================
+    containerEl.createEl('h2', { text: '🤖 AI Features' });
+
+    containerEl.createEl('p', {
+      text: 'AI-powered features coming soon. This section will include automated analysis, suggestions, and integrations.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('AI Analysis')
+      .setDesc('Future: AI-powered term detection and analysis')
+      .addButton(button => button
+        .setButtonText('Coming Soon')
+        .setDisabled(true));
   }
 }
 
