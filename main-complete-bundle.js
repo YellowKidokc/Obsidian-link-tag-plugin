@@ -454,7 +454,16 @@ const DEFAULT_SETTINGS = {
   // Advanced
   flagUndefined: true,
   showUsageCount: true,
+  
+  // Postgres Sync
   postgresSync: false,
+  postgresHost: 'localhost',
+  postgresPort: 5432,
+  postgresDatabase: 'theophysics',
+  postgresUser: '',
+  postgresPassword: '',
+  postgresSyncInterval: 300, // seconds (5 minutes)
+  
   whitelist: [],
   blacklist: [],
   trackKeywords: true,
@@ -811,6 +820,122 @@ class TheophysicsSettingTab extends PluginSettingTab {
 
   displayAdvancedTab(containerEl) {
     containerEl.createEl('h2', { text: 'Advanced Settings' });
+
+    containerEl.createEl('h3', { text: '🗄️ Postgres Sync' });
+
+    containerEl.createEl('p', {
+      text: 'Sync your vault data to a PostgreSQL database for external analysis and backup.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Enable Postgres sync')
+      .setDesc('Automatically sync dashboards and analytics to PostgreSQL')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.postgresSync)
+        .onChange(async (value) => {
+          this.plugin.settings.postgresSync = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.postgresSync) {
+      new Setting(containerEl)
+        .setName('Database host')
+        .setDesc('PostgreSQL server hostname or IP address')
+        .addText(text => text
+          .setPlaceholder('localhost')
+          .setValue(this.plugin.settings.postgresHost)
+          .onChange(async (value) => {
+            this.plugin.settings.postgresHost = value || 'localhost';
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(containerEl)
+        .setName('Database port')
+        .setDesc('PostgreSQL server port (default: 5432)')
+        .addText(text => text
+          .setPlaceholder('5432')
+          .setValue(String(this.plugin.settings.postgresPort))
+          .onChange(async (value) => {
+            const port = parseInt(value, 10);
+            if (!isNaN(port) && port > 0 && port < 65536) {
+              this.plugin.settings.postgresPort = port;
+              await this.plugin.saveSettings();
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Database name')
+        .setDesc('Name of the PostgreSQL database')
+        .addText(text => text
+          .setPlaceholder('theophysics')
+          .setValue(this.plugin.settings.postgresDatabase)
+          .onChange(async (value) => {
+            this.plugin.settings.postgresDatabase = value || 'theophysics';
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(containerEl)
+        .setName('Database user')
+        .setDesc('PostgreSQL username')
+        .addText(text => text
+          .setPlaceholder('postgres')
+          .setValue(this.plugin.settings.postgresUser)
+          .onChange(async (value) => {
+            this.plugin.settings.postgresUser = value;
+            await this.plugin.saveSettings();
+          }));
+
+      new Setting(containerEl)
+        .setName('Database password')
+        .setDesc('PostgreSQL password (stored securely)')
+        .addText(text => {
+          text
+            .setPlaceholder('Enter password')
+            .setValue(this.plugin.settings.postgresPassword)
+            .onChange(async (value) => {
+              this.plugin.settings.postgresPassword = value;
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.setAttribute('type', 'password');
+        });
+
+      new Setting(containerEl)
+        .setName('Sync interval')
+        .setDesc('How often to sync data (in seconds, minimum 60)')
+        .addText(text => text
+          .setPlaceholder('300')
+          .setValue(String(this.plugin.settings.postgresSyncInterval))
+          .onChange(async (value) => {
+            const interval = parseInt(value, 10);
+            if (!isNaN(interval) && interval >= 60) {
+              this.plugin.settings.postgresSyncInterval = interval;
+              await this.plugin.saveSettings();
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Test connection')
+        .setDesc('Verify PostgreSQL connection settings')
+        .addButton(button => button
+          .setButtonText('Test Connection')
+          .onClick(async () => {
+            await this.plugin.testPostgresConnection();
+          }));
+
+      new Setting(containerEl)
+        .setName('Sync now')
+        .setDesc('Manually trigger a sync to PostgreSQL')
+        .addButton(button => button
+          .setButtonText('Sync Now')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.syncToPostgres();
+          }));
+    }
+
+    containerEl.createEl('h3', { text: '📁 File Settings' });
 
     new Setting(containerEl)
       .setName('Glossary file')

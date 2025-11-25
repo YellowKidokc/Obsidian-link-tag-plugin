@@ -7,6 +7,7 @@ const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
 const { MathTranslatorCommand } = require('./math-translator-command');
 const { AIIntegration } = require('./ai-integration');
+const { PostgresSync } = require('./postgres-sync');
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -17,8 +18,14 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
     this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
     this.aiIntegration = new AIIntegration(this.app, this.settings);
+    this.postgresSync = new PostgresSync(this.app, this.settings);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
+
+    // Start Postgres auto-sync if enabled
+    if (this.settings.postgresSync) {
+      this.postgresSync.startAutoSync();
+    }
 
     this.registerEvent(this.app.vault.on('modify', async (file) => {
       if (!this.settings.autoLinking || !(file instanceof TFile)) return;
@@ -687,5 +694,34 @@ Core concepts not yet referenced:\n\n`;
     await this.generateKeywordDashboard();
 
     new Notice('AI: All dashboards enhanced!');
+  }
+
+  // Postgres Sync Methods
+  async testPostgresConnection() {
+    await this.postgresSync.testConnection();
+  }
+
+  async syncToPostgres() {
+    await this.postgresSync.syncAll();
+  }
+
+  async onunload() {
+    // Cleanup Postgres sync
+    if (this.postgresSync) {
+      this.postgresSync.cleanup();
+    }
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+    
+    // Restart auto-sync if settings changed
+    if (this.postgresSync) {
+      if (this.settings.postgresSync) {
+        this.postgresSync.startAutoSync();
+      } else {
+        this.postgresSync.stopAutoSync();
+      }
+    }
   }
 };
