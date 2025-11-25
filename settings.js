@@ -59,7 +59,7 @@ const DEFAULT_SETTINGS = {
   
   // Postgres Sync
   postgresSync: false,
-  postgresUrl: 'postgresql://postgres:Moss9pep28$@192.168.1.93:5432/memory',
+  postgresUrl: 'postgresql://postgres:Moss9pep28$@192.168.1.93:5432/theophysics',
   postgresSyncInterval: 300, // seconds (5 minutes)
   
   whitelist: [],
@@ -697,7 +697,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
       .setName('PostgreSQL Connection URL')
       .setDesc('Connection string for PostgreSQL database (e.g., postgresql://user:password@host:port/database)')
       .addText(text => text
-        .setPlaceholder('postgresql://postgres:password@192.168.1.93:5432/memory')
+        .setPlaceholder('postgresql://postgres:password@192.168.1.93:5432/theophysics')
         .setValue(this.plugin.settings.postgresUrl)
         .onChange(async (value) => {
           this.plugin.settings.postgresUrl = value;

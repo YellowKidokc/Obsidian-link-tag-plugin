@@ -22,7 +22,7 @@ This will install the `pg` (node-postgres) library needed for database connectio
 ### 2. PostgreSQL Database
 You need a PostgreSQL database running. Your current connection:
 ```
-postgresql://postgres:Moss9pep28$@192.168.1.93:5432/memory
+postgresql://postgres:Moss9pep28$@192.168.1.93:5432/theophysics
 ```
 
 ## Setup Steps
@@ -32,7 +32,7 @@ postgresql://postgres:Moss9pep28$@192.168.1.93:5432/memory
 2. Go to **Advanced** tab
 3. Enter your PostgreSQL connection URL:
    ```
-   postgresql://postgres:Moss9pep28$@192.168.1.93:5432/memory
+   postgresql://postgres:Moss9pep28$@192.168.1.93:5432/theophysics
    ```
 
 ### 2. Test Connection
@@ -144,7 +144,7 @@ LIMIT 20;
 
 ### "Failed to initialize schema"
 - Check database user has CREATE permissions
-- Verify database 'memory' exists
+- Verify database 'theophysics' exists
 - Check console (Ctrl+Shift+I) for detailed errors
 
 ### Right-click menu not showing
