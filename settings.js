@@ -74,6 +74,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.activeTab = 'general';
   }
 
   display() {
@@ -81,13 +82,58 @@ class TheophysicsSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl('h1', { text: 'Theophysics Research Automation' });
 
-    // =================================================================
-    // GENERAL SETTINGS
-    // =================================================================
-    containerEl.createEl('h2', { text: '⚙️ General Settings' });
+    // Create tab navigation
+    const tabNav = containerEl.createDiv({ cls: 'theophysics-tab-nav' });
+    
+    const tabs = [
+      { id: 'general', name: '⚙️ General', icon: '⚙️' },
+      { id: 'math', name: '🔣 Math Translation', icon: '🔣' },
+      { id: 'theory', name: '📚 Theory Integration', icon: '📚' },
+      { id: 'analytics', name: '📊 Analytics', icon: '📊' },
+      { id: 'ai', name: '🤖 AI Integration', icon: '🤖' },
+      { id: 'advanced', name: '🔧 Advanced', icon: '🔧' }
+    ];
 
-    // ===== GENERAL SETTINGS =====
-    containerEl.createEl('h3', { text: '⚙️ General Settings' });
+    tabs.forEach(tab => {
+      const tabButton = tabNav.createEl('button', {
+        text: tab.name,
+        cls: this.activeTab === tab.id ? 'theophysics-tab-active' : 'theophysics-tab'
+      });
+      tabButton.addEventListener('click', () => {
+        this.activeTab = tab.id;
+        this.display();
+      });
+    });
+
+    // Create tab content container
+    const tabContent = containerEl.createDiv({ cls: 'theophysics-tab-content' });
+
+    // Display active tab content
+    switch (this.activeTab) {
+      case 'general':
+        this.displayGeneralTab(tabContent);
+        break;
+      case 'math':
+        this.displayMathTab(tabContent);
+        break;
+      case 'theory':
+        this.displayTheoryTab(tabContent);
+        break;
+      case 'analytics':
+        this.displayAnalyticsTab(tabContent);
+        break;
+      case 'ai':
+        this.displayAITab(tabContent);
+        break;
+      case 'advanced':
+        this.displayAdvancedTab(tabContent);
+        break;
+    }
+  }
+
+  displayGeneralTab(containerEl) {
+
+    containerEl.createEl('h2', { text: 'General Settings' });
     
     new Setting(containerEl)
       .setName('Auto-linking')
@@ -139,8 +185,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }
         }));
 
-    // ===== DETECTION LAYERS =====
-    containerEl.createEl('h3', { text: '🔍 Detection Layers' });
+    containerEl.createEl('h2', { text: 'Detection Layers' });
     
     new Setting(containerEl)
       .setName('Use custom terms only')
@@ -181,8 +226,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           await this.plugin.openCustomTermsFile();
         }));
 
-    // ===== MATH LAYER =====
-    containerEl.createEl('h3', { text: '🔢 Math Layer' });
+    containerEl.createEl('h2', { text: 'Math Layer' });
     
     new Setting(containerEl)
       .setName('Enable math layer')
@@ -241,8 +285,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }));
     }
 
-    // ===== COMBINED THEORIES LAYER =====
-    containerEl.createEl('h3', { text: '🧬 Combined Theories Layer' });
+    containerEl.createEl('h2', { text: 'Combined Theories Layer' });
     
     new Setting(containerEl)
       .setName('Enable theories layer')
@@ -305,8 +348,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }));
     }
 
-    // ===== ANALYTICS & OUTPUT =====
-    containerEl.createEl('h3', { text: '📊 Analytics & Output' });
+    containerEl.createEl('h2', { text: 'Analytics & Output' });
     
     new Setting(containerEl)
       .setName('Auto-generate term pages')
@@ -331,8 +373,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    // ===== EXTERNAL LINKS =====
-    containerEl.createEl('h3', { text: '🔗 External Links' });
+    containerEl.createEl('h2', { text: 'External Links' });
     
     new Setting(containerEl)
       .setName('Fetch external links')
@@ -367,8 +408,7 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }));
     }
 
-    // ===== ACTIONS =====
-    containerEl.createEl('h3', { text: '⚡ Actions' });
+    containerEl.createEl('h2', { text: 'Actions' });
     
     new Setting(containerEl)
       .setName('Scan vault now')
@@ -379,11 +419,48 @@ class TheophysicsSettingTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.runFullScan();
         }));
+  }
 
-    // =================================================================
-    // DATA ANALYTICS & KEYWORDS
-    // =================================================================
-    containerEl.createEl('h2', { text: '📊 Data Analytics & Keywords' });
+  displayMathTab(containerEl) {
+    containerEl.createEl('h2', { text: 'Math Translation' });
+
+    containerEl.createEl('p', {
+      text: 'Track mathematical symbols and equations across your vault.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Math Translation Dashboard')
+      .setDesc('Generate comprehensive analysis of mathematical symbols and equations')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateMathDashboard();
+        }));
+  }
+
+  displayTheoryTab(containerEl) {
+    containerEl.createEl('h2', { text: 'Theory Integration' });
+
+    containerEl.createEl('p', {
+      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Theory Integration Dashboard')
+      .setDesc('Track framework references and integration metrics')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateTheoryDashboard();
+        }));
+  }
+
+  displayAnalyticsTab(containerEl) {
+    containerEl.createEl('h2', { text: 'Data Analytics & Keywords' });
 
     new Setting(containerEl)
       .setName('Analytics folder')
@@ -439,51 +516,10 @@ class TheophysicsSettingTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.generateKeywordDashboard();
         }));
+  }
 
-    // =================================================================
-    // MATH TRANSLATION
-    // =================================================================
-    containerEl.createEl('h2', { text: '🔣 Math Translation' });
-
-    containerEl.createEl('p', {
-      text: 'Track mathematical symbols and equations across your vault.',
-      cls: 'setting-item-description'
-    });
-
-    new Setting(containerEl)
-      .setName('Math Translation Dashboard')
-      .setDesc('Generate comprehensive analysis of mathematical symbols and equations')
-      .addButton(button => button
-        .setButtonText('Generate Dashboard')
-        .setCta()
-        .onClick(async () => {
-          await this.plugin.generateMathDashboard();
-        }));
-
-    // =================================================================
-    // THEORY INTEGRATION
-    // =================================================================
-    containerEl.createEl('h2', { text: '📚 Theory Integration' });
-
-    containerEl.createEl('p', {
-      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness.',
-      cls: 'setting-item-description'
-    });
-
-    new Setting(containerEl)
-      .setName('Theory Integration Dashboard')
-      .setDesc('Track framework references and integration metrics')
-      .addButton(button => button
-        .setButtonText('Generate Dashboard')
-        .setCta()
-        .onClick(async () => {
-          await this.plugin.generateTheoryDashboard();
-        }));
-
-    // =================================================================
-    // AI INTEGRATION LAYER
-    // =================================================================
-    containerEl.createEl('h2', { text: '🤖 AI Integration Layer' });
+  displayAITab(containerEl) {
+    containerEl.createEl('h2', { text: 'AI Integration Layer' });
 
     containerEl.createEl('p', {
       text: 'Smart assistant that reads your papers and automatically finds missing symbols, theories, and keywords to enhance your dashboards.',
@@ -570,6 +606,63 @@ class TheophysicsSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }));
     }
+  }
+
+  displayAdvancedTab(containerEl) {
+    containerEl.createEl('h2', { text: 'Advanced Settings' });
+
+    new Setting(containerEl)
+      .setName('Glossary file')
+      .setDesc('Main glossary file for term definitions')
+      .addText(text => text
+        .setPlaceholder('Theophysics_Glossary.md')
+        .setValue(this.plugin.settings.glossaryFile)
+        .onChange(async (value) => {
+          this.plugin.settings.glossaryFile = value || DEFAULT_SETTINGS.glossaryFile;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Review queue file')
+      .setDesc('File where term review queue is generated')
+      .addText(text => text
+        .setPlaceholder('_term_review_queue.md')
+        .setValue(this.plugin.settings.reviewQueueFile)
+        .onChange(async (value) => {
+          this.plugin.settings.reviewQueueFile = value || DEFAULT_SETTINGS.reviewQueueFile;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Excluded folders')
+      .setDesc('Comma-separated list of folders to exclude from scanning')
+      .addTextArea(text => text
+        .setPlaceholder('Assets, audio, .obsidian')
+        .setValue(this.plugin.settings.excludedFolders.join(', '))
+        .onChange(async (value) => {
+          this.plugin.settings.excludedFolders = value.split(',').map(f => f.trim()).filter(f => f);
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Flag undefined terms')
+      .setDesc('Show warnings for terms without glossary entries')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.flagUndefined)
+        .onChange(async (value) => {
+          this.plugin.settings.flagUndefined = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Show usage count')
+      .setDesc('Display term frequency in review queue')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.showUsageCount)
+        .onChange(async (value) => {
+          this.plugin.settings.showUsageCount = value;
+          await this.plugin.saveSettings();
+        }));
   }
 }
 

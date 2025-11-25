@@ -23,3 +23,47 @@
   padding: 2px 6px;
   font-size: 0.9em;
 }
+
+/* Tab Navigation Styles */
+.theophysics-tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--background-modifier-border);
+  padding-bottom: 0;
+  flex-wrap: wrap;
+}
+
+.theophysics-tab {
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+}
+
+.theophysics-tab:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.theophysics-tab-active {
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--interactive-accent);
+  border-bottom: 2px solid var(--interactive-accent);
+  margin-bottom: -2px;
+}
+
+.theophysics-tab-content {
+  padding-top: 10px;
+}
