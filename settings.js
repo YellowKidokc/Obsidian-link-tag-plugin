@@ -58,7 +58,16 @@ const DEFAULT_SETTINGS = {
   showUsageCount: true,
   postgresSync: false,
   whitelist: [],
-  blacklist: []
+  blacklist: [],
+  // New analytics settings
+  analyticsFolder: 'Data Analytics',
+  trackKeywords: true,
+  trackTags: true,
+  minTagFrequency: 2,
+  // AI Integration
+  aiEnabled: false,
+  aiConfidence: 0.7,
+  aiAutoUpdate: false
 };
 
 class TheophysicsSettingTab extends PluginSettingTab {
@@ -70,7 +79,12 @@ class TheophysicsSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl('h2', { text: 'Theophysics Research Automation Settings' });
+    containerEl.createEl('h1', { text: 'Theophysics Research Automation' });
+
+    // =================================================================
+    // GENERAL SETTINGS
+    // =================================================================
+    containerEl.createEl('h2', { text: '⚙️ General Settings' });
 
     // ===== GENERAL SETTINGS =====
     containerEl.createEl('h3', { text: '⚙️ General Settings' });
@@ -365,6 +379,197 @@ class TheophysicsSettingTab extends PluginSettingTab {
         .onClick(async () => {
           await this.plugin.runFullScan();
         }));
+
+    // =================================================================
+    // DATA ANALYTICS & KEYWORDS
+    // =================================================================
+    containerEl.createEl('h2', { text: '📊 Data Analytics & Keywords' });
+
+    new Setting(containerEl)
+      .setName('Analytics folder')
+      .setDesc('Folder where all dashboards will be saved (auto-created if missing)')
+      .addText(text => text
+        .setPlaceholder('Data Analytics')
+        .setValue(this.plugin.settings.analyticsFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.analyticsFolder = value || DEFAULT_SETTINGS.analyticsFolder;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Track keywords')
+      .setDesc('Enable keyword frequency tracking across vault')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.trackKeywords)
+        .onChange(async (value) => {
+          this.plugin.settings.trackKeywords = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Track tags')
+      .setDesc('Enable tag analytics and frequency tracking')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.trackTags)
+        .onChange(async (value) => {
+          this.plugin.settings.trackTags = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Minimum tag frequency')
+      .setDesc('Only show tags that appear at least this many times')
+      .addText(text => text
+        .setPlaceholder('2')
+        .setValue(String(this.plugin.settings.minTagFrequency))
+        .onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.minTagFrequency = num;
+            await this.plugin.saveSettings();
+          }
+        }));
+
+    new Setting(containerEl)
+      .setName('Keyword & Tag Analytics Dashboard')
+      .setDesc('Generate comprehensive tag and keyword frequency analysis')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateKeywordDashboard();
+        }));
+
+    // =================================================================
+    // MATH TRANSLATION
+    // =================================================================
+    containerEl.createEl('h2', { text: '🔣 Math Translation' });
+
+    containerEl.createEl('p', {
+      text: 'Track mathematical symbols and equations across your vault.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Math Translation Dashboard')
+      .setDesc('Generate comprehensive analysis of mathematical symbols and equations')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateMathDashboard();
+        }));
+
+    // =================================================================
+    // THEORY INTEGRATION
+    // =================================================================
+    containerEl.createEl('h2', { text: '📚 Theory Integration' });
+
+    containerEl.createEl('p', {
+      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Theory Integration Dashboard')
+      .setDesc('Track framework references and integration metrics')
+      .addButton(button => button
+        .setButtonText('Generate Dashboard')
+        .setCta()
+        .onClick(async () => {
+          await this.plugin.generateTheoryDashboard();
+        }));
+
+    // =================================================================
+    // AI INTEGRATION LAYER
+    // =================================================================
+    containerEl.createEl('h2', { text: '🤖 AI Integration Layer' });
+
+    containerEl.createEl('p', {
+      text: 'Smart assistant that reads your papers and automatically finds missing symbols, theories, and keywords to enhance your dashboards.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
+      .setName('Enable AI integration')
+      .setDesc('Allow AI to analyze your vault and suggest improvements to tracking lists')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.aiEnabled || false)
+        .onChange(async (value) => {
+          this.plugin.settings.aiEnabled = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+
+    if (this.plugin.settings.aiEnabled) {
+      containerEl.createEl('h3', { text: '🔍 AI Analysis Actions' });
+
+      new Setting(containerEl)
+        .setName('Analyze current file')
+        .setDesc('AI scans current file for missing symbols, theories, and keywords')
+        .addButton(button => button
+          .setButtonText('Analyze File')
+          .setCta()
+          .onClick(async () => {
+            const view = this.plugin.app.workspace.getActiveViewOfType(require('obsidian').MarkdownView);
+            if (view && view.file) {
+              await this.plugin.aiAnalyzeFile(view.file);
+            } else {
+              new (require('obsidian').Notice)('No file open');
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Analyze entire vault')
+        .setDesc('AI scans all files and generates comprehensive enhancement report')
+        .addButton(button => button
+          .setButtonText('Analyze Vault')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.aiAnalyzeVault();
+          }));
+
+      new Setting(containerEl)
+        .setName('Enhance all dashboards')
+        .setDesc('Run AI analysis then regenerate all dashboards with findings')
+        .addButton(button => button
+          .setButtonText('Enhance All')
+          .setCta()
+          .onClick(async () => {
+            await this.plugin.aiEnhanceAll();
+          }));
+
+      containerEl.createEl('h3', { text: '⚙️ AI Configuration' });
+
+      containerEl.createEl('p', {
+        text: 'Configure how AI identifies and categorizes new discoveries.',
+        cls: 'setting-item-description'
+      });
+
+      new Setting(containerEl)
+        .setName('Detection confidence')
+        .setDesc('Minimum confidence (0.0-1.0) for AI to suggest new items')
+        .addText(text => text
+          .setPlaceholder('0.7')
+          .setValue(String(this.plugin.settings.aiConfidence || 0.7))
+          .onChange(async (value) => {
+            const num = parseFloat(value);
+            if (!isNaN(num) && num >= 0 && num <= 1) {
+              this.plugin.settings.aiConfidence = num;
+              await this.plugin.saveSettings();
+            }
+          }));
+
+      new Setting(containerEl)
+        .setName('Auto-update tracking lists')
+        .setDesc('Automatically add AI discoveries to tracking lists (experimental)')
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.aiAutoUpdate || false)
+          .onChange(async (value) => {
+            this.plugin.settings.aiAutoUpdate = value;
+            await this.plugin.saveSettings();
+          }));
+    }
   }
 }
 
