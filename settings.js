@@ -67,7 +67,13 @@ const DEFAULT_SETTINGS = {
   // AI Integration
   aiEnabled: false,
   aiConfidence: 0.7,
-  aiAutoUpdate: false
+  aiAutoUpdate: false,
+  claudeApiKey: '',
+  openaiApiKey: '',
+  
+  // Dashboard Settings
+  showDashboardNotifications: true,
+  autoCreateAnalyticsFolder: true
 };
 
 class TheophysicsSettingTab extends PluginSettingTab {
@@ -408,13 +414,42 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }));
     }
 
-    containerEl.createEl('h2', { text: 'Actions' });
+    containerEl.createEl('h2', { text: 'Folder Configuration' });
     
     new Setting(containerEl)
+      .setName('Global analytics folder')
+      .setDesc('Main folder for all dashboards and analytics (created automatically)')
+      .addText(text => text
+        .setPlaceholder('Data Analytics')
+        .setValue(this.plugin.settings.analyticsFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.analyticsFolder = value || DEFAULT_SETTINGS.analyticsFolder;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Local analytics folder')
+      .setDesc('Folder name for local analytics within scoped folders')
+      .addText(text => text
+        .setPlaceholder('_Data_Analytics')
+        .setValue(this.plugin.settings.globalAnalyticsFolder)
+        .onChange(async (value) => {
+          this.plugin.settings.globalAnalyticsFolder = value || DEFAULT_SETTINGS.globalAnalyticsFolder;
+          await this.plugin.saveSettings();
+        }));
+
+    containerEl.createEl('h2', { text: 'Actions' });
+    
+    containerEl.createEl('p', {
+      text: '⚠️ First generate all dashboards here to create the Data Analytics folder. Then use individual tabs to update specific dashboards.',
+      cls: 'setting-item-description'
+    });
+
+    new Setting(containerEl)
       .setName('Scan vault now')
-      .setDesc('Run full scan with all enabled detection layers')
+      .setDesc('Run full scan with all enabled detection layers (shows progress)')
       .addButton(button => button
-        .setButtonText('Scan')
+        .setButtonText('Scan Vault')
         .setCta()
         .onClick(async () => {
           await this.plugin.runFullScan();
@@ -425,15 +460,15 @@ class TheophysicsSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'Math Translation' });
 
     containerEl.createEl('p', {
-      text: 'Track mathematical symbols and equations across your vault.',
+      text: 'Track mathematical symbols and equations across your vault. Dashboard is saved in the Data Analytics folder.',
       cls: 'setting-item-description'
     });
 
     new Setting(containerEl)
-      .setName('Math Translation Dashboard')
-      .setDesc('Generate comprehensive analysis of mathematical symbols and equations')
+      .setName('Generate/Update Math Translation Dashboard')
+      .setDesc('Updates the math dashboard in the Data Analytics folder')
       .addButton(button => button
-        .setButtonText('Generate Dashboard')
+        .setButtonText('Update Dashboard')
         .setCta()
         .onClick(async () => {
           await this.plugin.generateMathDashboard();
@@ -444,15 +479,15 @@ class TheophysicsSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'Theory Integration' });
 
     containerEl.createEl('p', {
-      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness.',
+      text: 'Track references to 80+ frameworks across Physics, Theology, Mathematics, and Consciousness. Dashboard is saved in the Data Analytics folder.',
       cls: 'setting-item-description'
     });
 
     new Setting(containerEl)
-      .setName('Theory Integration Dashboard')
-      .setDesc('Track framework references and integration metrics')
+      .setName('Generate/Update Theory Integration Dashboard')
+      .setDesc('Updates the theory dashboard in the Data Analytics folder')
       .addButton(button => button
-        .setButtonText('Generate Dashboard')
+        .setButtonText('Update Dashboard')
         .setCta()
         .onClick(async () => {
           await this.plugin.generateTheoryDashboard();
@@ -462,16 +497,10 @@ class TheophysicsSettingTab extends PluginSettingTab {
   displayAnalyticsTab(containerEl) {
     containerEl.createEl('h2', { text: 'Data Analytics & Keywords' });
 
-    new Setting(containerEl)
-      .setName('Analytics folder')
-      .setDesc('Folder where all dashboards will be saved (auto-created if missing)')
-      .addText(text => text
-        .setPlaceholder('Data Analytics')
-        .setValue(this.plugin.settings.analyticsFolder)
-        .onChange(async (value) => {
-          this.plugin.settings.analyticsFolder = value || DEFAULT_SETTINGS.analyticsFolder;
-          await this.plugin.saveSettings();
-        }));
+    containerEl.createEl('p', {
+      text: 'Configure keyword and tag tracking settings. Dashboards are saved in the Data Analytics folder.',
+      cls: 'setting-item-description'
+    });
 
     new Setting(containerEl)
       .setName('Track keywords')
@@ -507,11 +536,23 @@ class TheophysicsSettingTab extends PluginSettingTab {
           }
         }));
 
+    containerEl.createEl('h2', { text: 'Dashboard Generation' });
+
     new Setting(containerEl)
-      .setName('Keyword & Tag Analytics Dashboard')
-      .setDesc('Generate comprehensive tag and keyword frequency analysis')
+      .setName('Show notifications')
+      .setDesc('Show popup notifications when dashboards are created or updated')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.showDashboardNotifications)
+        .onChange(async (value) => {
+          this.plugin.settings.showDashboardNotifications = value;
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(containerEl)
+      .setName('Generate/Update Keyword & Tag Dashboard')
+      .setDesc('Updates the analytics dashboard in the Data Analytics folder')
       .addButton(button => button
-        .setButtonText('Generate Dashboard')
+        .setButtonText('Update Dashboard')
         .setCta()
         .onClick(async () => {
           await this.plugin.generateKeywordDashboard();
@@ -525,6 +566,34 @@ class TheophysicsSettingTab extends PluginSettingTab {
       text: 'Smart assistant that reads your papers and automatically finds missing symbols, theories, and keywords to enhance your dashboards.',
       cls: 'setting-item-description'
     });
+
+    containerEl.createEl('h3', { text: '🔑 API Keys' });
+
+    new Setting(containerEl)
+      .setName('Claude API Key')
+      .setDesc('Your Anthropic Claude API key for AI analysis')
+      .addText(text => text
+        .setPlaceholder('sk-ant-...')
+        .setValue(this.plugin.settings.claudeApiKey || '')
+        .onChange(async (value) => {
+          this.plugin.settings.claudeApiKey = value;
+          await this.plugin.saveSettings();
+        })
+        .inputEl.setAttribute('type', 'password'));
+
+    new Setting(containerEl)
+      .setName('OpenAI API Key')
+      .setDesc('Your OpenAI API key for AI analysis')
+      .addText(text => text
+        .setPlaceholder('sk-...')
+        .setValue(this.plugin.settings.openaiApiKey || '')
+        .onChange(async (value) => {
+          this.plugin.settings.openaiApiKey = value;
+          await this.plugin.saveSettings();
+        })
+        .inputEl.setAttribute('type', 'password'));
+
+    containerEl.createEl('h3', { text: '⚙️ AI Settings' });
 
     new Setting(containerEl)
       .setName('Enable AI integration')
