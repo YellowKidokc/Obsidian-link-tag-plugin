@@ -1,0 +1,25 @@
+{
+  "name": "theophysics-research-automation",
+  "version": "1.0.0",
+  "description": "Obsidian plugin for research automation with epistemic classification and PostgreSQL sync",
+  "main": "main.js",
+  "scripts": {
+    "dev": "echo 'No build process - direct JavaScript'",
+    "build": "echo 'No build process - direct JavaScript'"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "research",
+    "epistemic",
+    "postgres"
+  ],
+  "author": "YellowKidokc",
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "obsidian": "latest"
+  }
+}

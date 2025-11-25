@@ -7,7 +7,7 @@ const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
 const { MathTranslatorCommand } = require('./math-translator-command');
 const { AIIntegration } = require('./ai-integration');
-const { PostgresSync } = require('./postgres-sync');
+const { DatabaseService } = require('./database-service');
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -18,14 +18,65 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
     this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
     this.aiIntegration = new AIIntegration(this.app, this.settings);
-    this.postgresSync = new PostgresSync(this.app, this.settings);
+    this.db = new DatabaseService(this.settings.postgresUrl);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
 
-    // Start Postgres auto-sync if enabled
-    if (this.settings.postgresSync) {
-      this.postgresSync.startAutoSync();
-    }
+    // Register right-click menu for epistemic classification
+    this.registerEvent(
+      this.app.workspace.on('editor-menu', (menu, editor, view) => {
+        const selection = editor.getSelection();
+        if (selection) {
+          menu.addSeparator();
+          
+          // Add classification options
+          menu.addItem((item) => {
+            item
+              .setTitle('Mark as Axiom ⚛')
+              .setIcon('axiom')
+              .onClick(async () => {
+                await this.classifySelection(view.file, selection, 'axiom', editor);
+              });
+          });
+          
+          menu.addItem((item) => {
+            item
+              .setTitle('Mark as Evidence ●')
+              .setIcon('evidence')
+              .onClick(async () => {
+                await this.classifySelection(view.file, selection, 'evidence', editor);
+              });
+          });
+          
+          menu.addItem((item) => {
+            item
+              .setTitle('Mark as Claim ◇')
+              .setIcon('claim')
+              .onClick(async () => {
+                await this.classifySelection(view.file, selection, 'claim', editor);
+              });
+          });
+          
+          menu.addItem((item) => {
+            item
+              .setTitle('Mark as Coherence ⟷')
+              .setIcon('coherence')
+              .onClick(async () => {
+                await this.classifySelection(view.file, selection, 'coherence', editor);
+              });
+          });
+          
+          menu.addItem((item) => {
+            item
+              .setTitle('Mark as Reference ◈')
+              .setIcon('reference')
+              .onClick(async () => {
+                await this.classifySelection(view.file, selection, 'reference', editor);
+              });
+          });
+        }
+      })
+    );
 
     this.registerEvent(this.app.vault.on('modify', async (file) => {
       if (!this.settings.autoLinking || !(file instanceof TFile)) return;
@@ -696,32 +747,56 @@ Core concepts not yet referenced:\n\n`;
     new Notice('AI: All dashboards enhanced!');
   }
 
-  // Postgres Sync Methods
-  async testPostgresConnection() {
-    await this.postgresSync.testConnection();
-  }
+  // Epistemic Classification Methods
+  async classifySelection(file, selection, typeName, editor) {
+    try {
+      // Get or create note UUID
+      const noteId = await this.db.getOrCreateNote(
+        file.path,
+        this.app.vault.getName(),
+        file.basename
+      );
 
-  async syncToPostgres() {
-    await this.postgresSync.syncAll();
+      // Get cursor position for offsets
+      const cursor = editor.getCursor();
+      const doc = editor.getDoc();
+      const startOffset = doc.posToOffset(editor.getCursor('from'));
+      const endOffset = doc.posToOffset(editor.getCursor('to'));
+      const lineStart = cursor.line;
+
+      // Save classification to database
+      await this.db.saveClassification(
+        noteId,
+        selection,
+        typeName,
+        startOffset,
+        endOffset,
+        lineStart,
+        lineStart,
+        'user'
+      );
+
+      new Notice(`✓ Marked as ${typeName}`);
+      console.log(`✅ Classified: "${selection.substring(0, 50)}..." as ${typeName}`);
+    } catch (error) {
+      new Notice(`✗ Failed to classify: ${error.message}`);
+      console.error('Classification error:', error);
+    }
   }
 
   async onunload() {
-    // Cleanup Postgres sync
-    if (this.postgresSync) {
-      this.postgresSync.cleanup();
+    // Cleanup database connection
+    if (this.db) {
+      await this.db.cleanup();
     }
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
     
-    // Restart auto-sync if settings changed
-    if (this.postgresSync) {
-      if (this.settings.postgresSync) {
-        this.postgresSync.startAutoSync();
-      } else {
-        this.postgresSync.stopAutoSync();
-      }
+    // Update database connection if URL changed
+    if (this.db && this.settings.postgresUrl) {
+      this.db.updateConnection(this.settings.postgresUrl);
     }
   }
 };

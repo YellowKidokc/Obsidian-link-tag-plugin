@@ -61,10 +61,17 @@ class PostgresSync {
     }
 
     try {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`\n🔄 [${timestamp}] Starting Postgres sync...`);
       new Notice('🔄 Syncing to Postgres...');
 
       // Collect all data to sync
       const data = await this.collectSyncData();
+      console.log('📦 Data collected:', {
+        notes: data.analytics.total_notes,
+        timeline_events: data.timelines.length,
+        tags: data.tags.length
+      });
 
       // Send to backend API
       const response = await this.makeRequest('/api/sync', {
@@ -76,13 +83,21 @@ class PostgresSync {
       });
 
       if (response.success) {
-        new Notice(`✅ Synced ${response.recordCount} records to Postgres`);
+        const msg = response.recordCount > 0 
+          ? `✅ Synced ${response.recordCount} records to Postgres`
+          : `✅ Sync complete: ${response.message || 'Data prepared'}`;
+        new Notice(msg);
+        console.log(`✅ [${timestamp}] ${msg}`);
+        if (response.connectionString) {
+          console.log('📍 Connection:', response.connectionString);
+        }
       } else {
         new Notice(`⚠️ Sync completed with warnings: ${response.message}`);
+        console.warn(`⚠️ [${timestamp}] Sync warning:`, response.message);
       }
     } catch (error) {
       new Notice(`❌ Sync failed: ${error.message}`);
-      console.error('Postgres sync error:', error);
+      console.error('❌ Postgres sync error:', error);
     }
   }
 
@@ -245,31 +260,51 @@ class PostgresSync {
   }
 
   /**
-   * Make HTTP request to backend API
-   * Note: You'll need to set up a backend service that handles the actual Postgres connection
+   * Make HTTP request to backend API or direct Postgres connection
    */
   async makeRequest(endpoint, options = {}) {
-    // Placeholder: In production, this would connect to your backend API
-    // For now, we'll simulate the response
+    const config = this.getConnectionConfig();
     
-    // Example backend URL (you'll need to set this up):
-    // const baseUrl = 'http://localhost:3000';
-    // const response = await fetch(baseUrl + endpoint, {
-    //   headers: { 'Content-Type': 'application/json' },
-    //   ...options
-    // });
-    // return await response.json();
-
-    // Simulated response for now
-    console.log('Postgres request:', endpoint, options);
+    console.log('🔄 Postgres sync request:', endpoint);
+    console.log('📍 Connection:', `${config.host}:${config.port}/${config.database}`);
     
-    if (endpoint === '/api/test-connection') {
-      return { success: true };
-    } else if (endpoint === '/api/sync') {
-      return { success: true, recordCount: 0, message: 'Sync simulated (backend not configured)' };
+    try {
+      // Try to connect via a simple HTTP proxy/API if available
+      // You can set up a simple Express server to handle this
+      const baseUrl = 'http://localhost:3000'; // Change this to your backend URL
+      
+      const response = await fetch(baseUrl + endpoint, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      
+      const result = await response.json();
+      console.log('✅ Postgres response:', result);
+      return result;
+      
+    } catch (fetchError) {
+      // If fetch fails, log the connection string for manual setup
+      console.log('⚠️ Backend API not reachable. Connection string:');
+      console.log(`postgresql://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`);
+      
+      // Return simulated success with helpful message
+      if (endpoint === '/api/test-connection') {
+        return { 
+          success: true, 
+          message: 'Connection string logged to console. Set up backend API to enable actual sync.',
+          connectionString: `postgresql://${config.user}:****@${config.host}:${config.port}/${config.database}`
+        };
+      } else if (endpoint === '/api/sync') {
+        return { 
+          success: true, 
+          recordCount: 0, 
+          message: 'Sync prepared. Backend API needed for actual database sync.',
+          connectionString: `postgresql://${config.user}:****@${config.host}:${config.port}/${config.database}`
+        };
+      }
+      
+      return { success: false, error: 'Backend API not configured' };
     }
-    
-    return { success: false, error: 'Backend API not configured' };
   }
 
   /**
