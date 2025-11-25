@@ -1,1344 +1,182 @@
-const { Plugin, Notice, TFile, PluginSettingTab, Setting } = require('obsidian');
-
-// ===== DETECTOR MODULE =====
-const DETECTION_PATTERNS = {
-  equations: /([A-Z][\w])\s*=\s*/g,
-  capitalizedPhrases: /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/g,
-  acronyms: /\b([A-Z]{2,})\b/g,
-  biblical: /\b([A-Z][a-z]+\s+\d+:\d+(?:-\d+)?)\b/g,
-  technical: /\b(\w+\s+(?:theorem|law|principle|equation|framework|field|coherence))\b/gi
-};
-
-const WHITELIST = [
-  'Master Equation',
-  'Lowe Coherence Lagrangian',
-  'Ten Laws Framework',
-  'PEAR Lab',
-  'General Relativity',
-  'Quantum Mechanics',
-  'Logos field',
-  'consciousness collapse'
-];
-
-const BLACKLIST = [
-  'the', 'and', 'is', 'was', 'are', 'were', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
-  'system', 'framework', 'process', 'method'
-];
-
-function shouldIgnore(term, extraWhitelist = []) {
-  const lower = term.toLowerCase();
-  const combinedWhitelist = [...WHITELIST, ...extraWhitelist.map(t => t.toLowerCase())];
-  if (combinedWhitelist.includes(lower)) return false;
-  if (BLACKLIST.includes(lower)) return true;
-  if (term.length < 3) return true;
-  return false;
-}
-
-function detectTerms(content, extraWhitelist = []) {
-  const occurrences = [];
-  const lines = content.split('\n');
-  lines.forEach((line, index) => {
-    if (!line.trim()) return;
-    Object.entries(DETECTION_PATTERNS).forEach(([category, pattern]) => {
-      const matches = line.matchAll(pattern);
-      for (const match of matches) {
-        const term = match[1];
-        if (!term || shouldIgnore(term, extraWhitelist)) continue;
-        occurrences.push({
-          term,
-          category,
-          line: index + 1,
-          context: line.trim()
-        });
-      }
-    });
-  });
-  return occurrences;
-}
-
-// ===== SETTINGS MODULE =====
-const DEFAULT_SETTINGS = {
-  autoLinking: true,
-  linkToGlossary: true,
-  linkToExternal: true,
-  detectScientific: true,
-  detectBiblical: true,
-  detectCitations: true,
-  detectEquations: true,
-  detectPersons: false,
-  autoGenerateStubs: true,
-  autoGenerateTermPages: true,
-  fetchExternalLinks: true,
-  smartLinkDisplay: true,
-  promptOnFirstView: true,
-  useAutoDetection: true,
-  useCustomTermsOnly: false,
-  flagUndefined: true,
-  showUsageCount: true,
-  postgresSync: false,
-  minFrequency: 1,
-  scanScope: 'global',
-  scopedFolder: '',
-  excludedFolders: ['Assets', 'assets', '_Assets', '.obsidian', 'audio', 'Audio'],
-  analyticsLocation: 'local',
-  analyticsFolder: '_Data_Analytics',
-  globalAnalyticsFolder: '_Data_Analytics_Global',
-  termPagesFolder: '_Term_Pages',
-  customTerms: [],
-  customTermsFile: 'Theophysics_Custom_Terms.md',
-  glossaryFile: 'Theophysics_Glossary.md',
-  reviewQueueFile: '_term_review_queue.md',
-  linkPreferences: {},
-  whitelist: [],
-  blacklist: []
-};
-
-class TheophysicsSettingTab extends PluginSettingTab {
-  constructor(app, plugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-
-  display() {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl('h2', { text: 'Theophysics Research Automation Settings' });
-
-    new Setting(containerEl)
-      .setName('Auto-linking')
-      .setDesc('Automatically link detected terms to glossary entries on file save')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.autoLinking)
-        .onChange(async (value) => {
-          this.plugin.settings.autoLinking = value;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName('Scan scope')
-      .setDesc('Choose between global (entire vault) or local (specific folder) scanning')
-      .addDropdown(dropdown => dropdown
-        .addOption('global', 'Global (Entire Vault)')
-        .addOption('local', 'Local (Specific Folder)')
-        .setValue(this.plugin.settings.scanScope)
-        .onChange(async (value) => {
-          this.plugin.settings.scanScope = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    if (this.plugin.settings.scanScope === 'local') {
-      new Setting(containerEl)
-        .setName('Scoped folder')
-        .setDesc('Folder path to scan (relative to vault root, e.g., 03_PUBLICATIONS/COMPLETE_LOGOS_PAPERS_FINAL)')
-        .addText(text => text
-          .setPlaceholder('folder/path')
-          .setValue(this.plugin.settings.scopedFolder)
-          .onChange(async (value) => {
-            // Clean up the path - remove vault root if present
-            let cleanPath = value.trim();
-            
-            // Remove absolute path prefix if user pasted it
-            const vaultPath = this.app.vault.adapter.basePath;
-            if (cleanPath.startsWith(vaultPath)) {
-              cleanPath = cleanPath.substring(vaultPath.length);
-            }
-            
-            // Remove leading/trailing slashes
-            cleanPath = cleanPath.replace(/^[\/\\]+|[\/\\]+$/g, '');
-            
-            // Convert backslashes to forward slashes
-            cleanPath = cleanPath.replace(/\\/g, '/');
-            
-            this.plugin.settings.scopedFolder = cleanPath;
-            await this.plugin.saveSettings();
-            
-            // Update the input to show cleaned path
-            text.setValue(cleanPath);
-          }))
-        .addButton(button => button
-          .setButtonText('Browse')
-          .onClick(async () => {
-            await this.plugin.browseFolders();
-          }));
-      
-      new Setting(containerEl)
-        .setDesc('💡 Tip: Right-click a folder in Obsidian → Copy path, then paste here. The plugin will auto-clean it.')
-        .setClass('setting-item-description');
-      
-      new Setting(containerEl)
-        .setName('Excluded folders')
-        .setDesc('Folders to skip during scanning (comma-separated, e.g., Assets, audio, images)')
-        .addTextArea(text => text
-          .setPlaceholder('Assets, audio, images')
-          .setValue(this.plugin.settings.excludedFolders.join(', '))
-          .onChange(async (value) => {
-            this.plugin.settings.excludedFolders = value
-              .split(',')
-              .map(f => f.trim())
-              .filter(f => f);
-            await this.plugin.saveSettings();
-          }))
-        .addButton(button => button
-          .setButtonText('Reset')
-          .onClick(async () => {
-            this.plugin.settings.excludedFolders = DEFAULT_SETTINGS.excludedFolders;
-            await this.plugin.saveSettings();
-            this.display();
-            new Notice('Exclusions reset to defaults');
-          }));
-    }
-
-    containerEl.createEl('h3', { text: 'Analytics Output' });
-
-    new Setting(containerEl)
-      .setName('Analytics location')
-      .setDesc('Where to save term analysis pages')
-      .addDropdown(dropdown => dropdown
-        .addOption('local', 'Local (inside scanned folder)')
-        .addOption('global', 'Global (vault root)')
-        .addOption('both', 'Both (local + aggregated global)')
-        .setValue(this.plugin.settings.analyticsLocation)
-        .onChange(async (value) => {
-          this.plugin.settings.analyticsLocation = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    if (this.plugin.settings.analyticsLocation === 'local' || this.plugin.settings.analyticsLocation === 'both') {
-      new Setting(containerEl)
-        .setName('Local analytics folder name')
-        .setDesc('Folder name created inside each scanned location')
-        .addText(text => text
-          .setPlaceholder('_Data_Analytics')
-          .setValue(this.plugin.settings.analyticsFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.analyticsFolder = value || '_Data_Analytics';
-            await this.plugin.saveSettings();
-          }));
-    }
-
-    if (this.plugin.settings.analyticsLocation === 'global' || this.plugin.settings.analyticsLocation === 'both') {
-      new Setting(containerEl)
-        .setName('Global analytics folder name')
-        .setDesc('Folder name in vault root for aggregated analysis')
-        .addText(text => text
-          .setPlaceholder('_Data_Analytics_Global')
-          .setValue(this.plugin.settings.globalAnalyticsFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.globalAnalyticsFolder = value || '_Data_Analytics_Global';
-            await this.plugin.saveSettings();
-          }));
-    }
-
-    containerEl.createEl('h3', { text: 'Term Detection' });
-
-    new Setting(containerEl)
-      .setName('Use custom terms only')
-      .setDesc('Only search for terms from your custom terms file (faster, more precise)')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.useCustomTermsOnly)
-        .onChange(async (value) => {
-          this.plugin.settings.useCustomTermsOnly = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    if (!this.plugin.settings.useCustomTermsOnly) {
-      new Setting(containerEl)
-        .setName('Use auto-detection')
-        .setDesc('Automatically detect technical terms, equations, and patterns')
-        .addToggle(toggle => toggle
-          .setValue(this.plugin.settings.useAutoDetection)
-          .onChange(async (value) => {
-            this.plugin.settings.useAutoDetection = value;
-            await this.plugin.saveSettings();
-          }));
-    }
-
-    new Setting(containerEl)
-      .setName('Auto-generate term pages')
-      .setDesc('Automatically create individual pages for each term with context aggregation')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.autoGenerateTermPages)
-        .onChange(async (value) => {
-          this.plugin.settings.autoGenerateTermPages = value;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName('Fetch external links')
-      .setDesc('Automatically fetch and embed links from Stanford Encyclopedia, arXiv, etc.')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.fetchExternalLinks)
-        .onChange(async (value) => {
-          this.plugin.settings.fetchExternalLinks = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-
-    if (this.plugin.settings.fetchExternalLinks) {
-      new Setting(containerEl)
-        .setName('Smart link display')
-        .setDesc('Learn from your behavior - hide links you\'ve seen before')
-        .addToggle(toggle => toggle
-          .setValue(this.plugin.settings.smartLinkDisplay)
-          .onChange(async (value) => {
-            this.plugin.settings.smartLinkDisplay = value;
-            await this.plugin.saveSettings();
-          }));
-
-      new Setting(containerEl)
-        .setName('Prompt on first view')
-        .setDesc('Ask if you want to keep seeing links after viewing a term page once')
-        .addToggle(toggle => toggle
-          .setValue(this.plugin.settings.promptOnFirstView)
-          .onChange(async (value) => {
-            this.plugin.settings.promptOnFirstView = value;
-            await this.plugin.saveSettings();
-          }));
-
-      new Setting(containerEl)
-        .setName('Manage link preferences')
-        .setDesc('View and edit which terms show external links')
-        .addButton(button => button
-          .setButtonText('Manage')
-          .onClick(async () => {
-            await this.plugin.showLinkPreferences();
-          }));
-    }
-
-    new Setting(containerEl)
-      .setName('Minimum frequency')
-      .setDesc('Only include terms that appear at least this many times across the vault')
-      .addText(text => text
-        .setPlaceholder('3')
-        .setValue(String(this.plugin.settings.minFrequency))
-        .onChange(async (value) => {
-          const num = parseInt(value, 10);
-          if (!isNaN(num) && num > 0) {
-            this.plugin.settings.minFrequency = num;
-            await this.plugin.saveSettings();
-          }
-        }));
-
-    new Setting(containerEl)
-      .setName('Custom terms file')
-      .setDesc('Markdown file where you manually add terms to track')
-      .addText(text => text
-        .setPlaceholder('Theophysics_Custom_Terms.md')
-        .setValue(this.plugin.settings.customTermsFile)
-        .onChange(async (value) => {
-          this.plugin.settings.customTermsFile = value || DEFAULT_SETTINGS.customTermsFile;
-          await this.plugin.saveSettings();
-        }));
-
-    new Setting(containerEl)
-      .setName('Open custom terms file')
-      .setDesc('Create or open your custom terms list')
-      .addButton(button => button
-        .setButtonText('Open')
-        .onClick(async () => {
-          await this.plugin.openCustomTermsFile();
-        }));
-
-    new Setting(containerEl)
-      .setName('Scan vault now')
-      .setDesc('Run detection with auto-detection and custom terms')
-      .addButton(button => button
-        .setButtonText('Scan')
-        .setCta()
-        .onClick(async () => {
-          await this.plugin.runFullScan();
-        }));
-
-    containerEl.createEl('h3', { text: 'Manual Controls & Safety' });
-
-    new Setting(containerEl)
-      .setName('Clear all term pages')
-      .setDesc('Delete all generated term pages (does not affect original files)')
-      .addButton(button => button
-        .setButtonText('Clear Pages')
-        .setWarning()
-        .onClick(async () => {
-          await this.plugin.clearTermPages();
-        }));
-
-    new Setting(containerEl)
-      .setName('Reset link preferences')
-      .setDesc('Clear all link display preferences and start fresh')
-      .addButton(button => button
-        .setButtonText('Reset')
-        .setWarning()
-        .onClick(async () => {
-          this.plugin.settings.linkPreferences = {};
-          await this.plugin.saveSettings();
-          new Notice('All link preferences cleared');
-        }));
-
-    new Setting(containerEl)
-      .setName('Export settings')
-      .setDesc('Backup your plugin settings to a file')
-      .addButton(button => button
-        .setButtonText('Export')
-        .onClick(async () => {
-          await this.plugin.exportSettings();
-        }));
-  }
-}
-
-// ===== GLOSSARY MANAGER MODULE =====
-class GlossaryManager {
-  constructor(app, settings) {
-    this.app = app;
-    this.settings = settings;
-    this.glossaryPath = settings.glossaryFile;
-  }
-
-  async ensureGlossaryExists() {
-    const file = this.app.vault.getAbstractFileByPath(this.glossaryPath);
-    if (file) return;
-    const template = `# Theophysics Central Glossary\n\n`; 
-    await this.app.vault.create(this.glossaryPath, template);
-  }
-
-  generateStub(term, count, files) {
-    const usedIn = files.length ? `Used in: ${files.join(', ')}` : 'Used in: (pending scan)';
-    return `## ${term}\n${usedIn}\nFrequency: ${count} occurrences\nBrief: [Add short description]\nFull Definition: [To be expanded]\nExternal Links:\n- \n`;
-  }
-
-  async addTerms(terms) {
-    await this.ensureGlossaryExists();
-    const file = this.app.vault.getAbstractFileByPath(this.glossaryPath);
-    const content = await this.app.vault.read(file);
-    let updated = content;
-    for (const term of terms) {
-      if (!content.includes(`## ${term}`)) {
-        updated += '\n' + this.generateStub(term, 0, []);
-      }
-    }
-    if (updated !== content) {
-      await this.app.vault.modify(file, updated);
-    }
-  }
-
-  async getGlossaryTerms() {
-    const file = this.app.vault.getAbstractFileByPath(this.glossaryPath);
-    if (!file) return [];
-    const content = await this.app.vault.read(file);
-    const matches = [...content.matchAll(/^##\s+(.+)$/gm)];
-    return matches.map(m => m[1]);
-  }
-
-  generateGlossaryLink(term, display) {
-    const page = this.glossaryPath.replace(/\.md$/, '');
-    const anchor = term.replace(/\s+/g, ' ');
-    return `[[${page}#${anchor}|${display}]]`;
-  }
-}
-
-// ===== SCANNER MODULE =====
-class TermScanner {
-  constructor(app, settings) {
-    this.app = app;
-    this.settings = settings;
-  }
-
-  async loadCustomTerms() {
-    const file = this.app.vault.getAbstractFileByPath(this.settings.customTermsFile);
-    console.log('Looking for custom terms file:', this.settings.customTermsFile);
-    console.log('File found:', !!file);
-    
-    if (!file) {
-      console.error('Custom terms file not found at:', this.settings.customTermsFile);
-      return [];
-    }
-    
-    const content = await this.app.vault.read(file);
-    console.log('File content length:', content.length);
-    
-    const terms = content.split('\n')
-      .map(line => line.trim())
-      .filter(line => line && !line.startsWith('#') && !line.startsWith('//') && !line.startsWith('---'));
-    
-    console.log('Parsed terms:', terms.length);
-    console.log('First 10 terms:', terms.slice(0, 10));
-    
-    return terms;
-  }
-
-  async scanFile(file, extraWhitelist, useAutoDetection) {
-    const content = await this.app.vault.read(file);
-    
-    let occurrences = [];
-    const lines = content.split('\n');
-
-    // 1. Run Regex Auto-Detection (if enabled)
-    if (useAutoDetection && !this.settings.useCustomTermsOnly) {
-      occurrences = detectTerms(content, extraWhitelist);
-    }
-
-    // 2. Explicitly Scan for Custom Terms + Built-in Whitelist
-    // We combine them to ensure we catch everything the user cares about
-    const termsToFind = [...new Set([...WHITELIST, ...extraWhitelist])];
-
-    lines.forEach((line, index) => {
-      if (!line.trim()) return;
-
-      termsToFind.forEach(term => {
-        if (!term) return;
-        
-        // Escape special characters for Regex
-        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
-        // Create regex to find the term (whole word, case insensitive)
-        const regex = new RegExp(`\\b${escapedTerm}\\b`, 'gi');
-        
-        const matches = line.matchAll(regex);
-        for (const match of matches) {
-          // Check if we already found this exact occurrence via auto-detection to avoid duplicates
-          const alreadyFound = occurrences.some(occ => 
-            occ.line === index + 1 && 
-            occ.term.toLowerCase() === term.toLowerCase()
-          );
-
-          if (!alreadyFound) {
-            occurrences.push({
-              term: match[0], // Use the actual text found (preserves case)
-              category: 'custom', // or 'whitelist'
-              line: index + 1,
-              context: line.trim(),
-              file: file.path
-            });
-          }
-        }
-      });
-    });
-    
-    return occurrences.map(o => ({ ...o, file: file.path }));
-  }
-
-  async scanVault(customTerms = []) {
-    let files = this.app.vault.getMarkdownFiles();
-    
-    console.log('Total markdown files in vault:', files.length);
-    console.log('Custom terms loaded:', customTerms.length, customTerms.slice(0, 5));
-    
-    // Filter by scope if local scanning is enabled
-    if (this.settings.scanScope === 'local' && this.settings.scopedFolder) {
-      const scopePath = this.settings.scopedFolder.replace(/\\/g, '/');
-      console.log('Filtering by scope path:', scopePath);
-      files = files.filter(f => f.path.startsWith(scopePath));
-      console.log('Files after filtering:', files.length);
-      if (files.length > 0) {
-        console.log('Sample file paths:', files.slice(0, 3).map(f => f.path));
-      }
-    }
-    
-    // Filter out excluded folders
-    if (this.settings.excludedFolders && this.settings.excludedFolders.length > 0) {
-      const beforeExclusion = files.length;
-      files = files.filter(f => {
-        const path = f.path.toLowerCase();
-        return !this.settings.excludedFolders.some(excluded => 
-          path.includes('/' + excluded.toLowerCase() + '/') || 
-          path.startsWith(excluded.toLowerCase() + '/')
-        );
-      });
-      console.log(`Excluded folders filter: ${beforeExclusion} -> ${files.length} files`);
-      console.log('Excluded folders:', this.settings.excludedFolders);
-    }
-    
-    const whitelist = [...WHITELIST, ...customTerms];
-    const allOccurrences = [];
-    for (const file of files) {
-      const occurrences = await this.scanFile(file, customTerms, this.settings.useAutoDetection);
-      console.log(`Scanned ${file.path}: found ${occurrences.length} occurrences`);
-      allOccurrences.push(...occurrences);
-    }
-    
-    console.log('Total occurrences before frequency filter:', allOccurrences.length);
-
-    const frequency = new Map();
-    for (const occ of allOccurrences) {
-      const key = occ.term;
-      if (!frequency.has(key)) frequency.set(key, { term: key, count: 0, files: new Set(), occurrences: [] });
-      const entry = frequency.get(key);
-      entry.count += 1;
-      entry.files.add(occ.file);
-      entry.occurrences.push(occ);
-    }
-
-    const list = [...frequency.values()].map(v => ({
-      term: v.term,
-      count: v.count,
-      files: [...v.files],
-      occurrences: v.occurrences
-    })).filter(item => item.count >= this.settings.minFrequency);
-
-    list.sort((a, b) => b.count - a.count);
-
-    return {
-      terms: list,
-      totalFiles: files.length,
-      totalOccurrences: allOccurrences.length,
-      scanDate: new Date()
-    };
-  }
-}
-
-// ===== REVIEW QUEUE MODULE =====
-class ReviewQueueGenerator {
-  constructor(app, settings) {
-    this.app = app;
-    this.settings = settings;
-    this.queuePath = settings.reviewQueueFile;
-  }
-
-  buildSection(title, terms) {
-    if (!terms.length) return '';
-    let content = `## ${title}\n\n`;
-    for (const term of terms) {
-      const fileList = term.files.join(', ');
-      const example = term.occurrences[0]?.context || '';
-      content += `- [ ] **${term.term}** (${term.count} occurrences)\n`;
-      content += `  - Files: ${fileList}\n`;
-      if (example) content += `  - Example: "${example}"\n`;
-      content += '\n';
-    }
-    return content;
-  }
-
-  buildContent(scanResult, customTerms) {
-    const { terms, totalFiles, totalOccurrences, scanDate } = scanResult;
-    const high = terms.filter(t => t.count >= 10);
-    const medium = terms.filter(t => t.count >= 5 && t.count <= 9);
-    const low = terms.filter(t => t.count >= 3 && t.count <= 4);
-
-    let content = `# Terms Detected - Needs Review\n`;
-    content += `Last Scan: ${scanDate.toLocaleString()}\n`;
-    content += `Files Scanned: ${totalFiles}\n`;
-    content += `Total Occurrences: ${totalOccurrences}\n`;
-    content += `Unique Terms Found: ${terms.length}\n\n`;
-
-    const customSet = new Set(customTerms.map(t => t.toLowerCase()));
-    const fromCustom = terms.filter(t => customSet.has(t.term.toLowerCase()));
-    const autoDetected = terms.filter(t => !customSet.has(t.term.toLowerCase()));
-
-    content += this.buildSection('From Custom Terms List (user-specified)', fromCustom);
-    content += this.buildSection('Auto-Detected (high confidence)', autoDetected.filter(t => t.count >= 10));
-    content += this.buildSection('Auto-Detected (medium confidence)', autoDetected.filter(t => t.count >= 5 && t.count <= 9));
-    content += this.buildSection('Auto-Detected (low confidence)', autoDetected.filter(t => t.count >= 3 && t.count <= 4));
-
-    return content;
-  }
-
-  async generateQueue(scanResult, customTerms) {
-    const content = this.buildContent(scanResult, customTerms);
-    const file = this.app.vault.getAbstractFileByPath(this.queuePath);
-    if (file) {
-      await this.app.vault.modify(file, content);
-    } else {
-      await this.app.vault.create(this.queuePath, content);
-    }
-  }
-
-  async getApprovedTerms() {
-    const file = this.app.vault.getAbstractFileByPath(this.queuePath);
-    if (!file) return [];
-    const content = await this.app.vault.read(file);
-    const matches = content.matchAll(/^- \[x\] \*\*(.+?)\*\*/gmi);
-    return [...matches].map(m => m[1]);
-  }
-
-  async clearQueue() {
-    const file = this.app.vault.getAbstractFileByPath(this.queuePath);
-    if (file) await this.app.vault.delete(file);
-  }
-}
-
-// ===== AUTO LINKER MODULE =====
-class AutoLinker {
-  constructor(app, settings, glossaryManager) {
-    this.app = app;
-    this.settings = settings;
-    this.glossaryManager = glossaryManager;
-  }
-
-  shouldSkip(file) {
-    return [
-      this.settings.glossaryFile,
-      this.settings.reviewQueueFile,
-      this.settings.customTermsFile
-    ].includes(file.path);
-  }
-
-  escapeRegExp(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  isLinked(line, term) {
-    const pattern = new RegExp(`\\[\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\]\\]`, 'i');
-    const mdPattern = new RegExp(`\\[[^\\]]*${this.escapeRegExp(term)}[^\\]]*\\]\\([^)]+\\)`, 'i');
-    return pattern.test(line) || mdPattern.test(line);
-  }
-
-  linkLine(line, terms) {
-    let result = line;
-    for (const term of terms) {
-      const regex = new RegExp(`\\b(${this.escapeRegExp(term)})\\b`, 'i');
-      const match = result.match(regex);
-      if (match && !this.isLinked(result, match[1])) {
-        const link = this.glossaryManager.generateGlossaryLink(term, match[1]);
-        result = result.replace(regex, link);
-      }
-    }
-    return result;
-  }
-
-  async processFile(file, terms) {
-    if (this.shouldSkip(file)) return;
-    const content = await this.app.vault.read(file);
-    const lines = content.split('\n');
-    const processed = [];
-    let inCode = false;
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('```')) {
-        inCode = !inCode;
-        processed.push(line);
-        continue;
-      }
-      if (trimmed.startsWith('---') || inCode) {
-        processed.push(line);
-        continue;
-      }
-      processed.push(this.linkLine(line, terms));
-    }
-    const newContent = processed.join('\n');
-    if (newContent !== content) {
-      await this.app.vault.modify(file, newContent);
-    }
-  }
-}
-
-// ===== EXTERNAL LINK FETCHER MODULE =====
-class ExternalLinkFetcher {
-  constructor(app, settings) {
-    this.app = app;
-    this.settings = settings;
-  }
-
-  async fetchStanfordLink(term) {
-    // Stanford Encyclopedia of Philosophy search
-    const searchTerm = encodeURIComponent(term);
-    const baseUrl = 'https://plato.stanford.edu/search/search';
-    return `${baseUrl}?query=${searchTerm}`;
-  }
-
-  async fetchArXivLink(term) {
-    // arXiv search
-    const searchTerm = encodeURIComponent(term);
-    return `https://arxiv.org/search/?query=${searchTerm}&searchtype=all`;
-  }
-
-  async fetchWikipediaLink(term) {
-    // Wikipedia search
-    const searchTerm = encodeURIComponent(term.replace(/\s+/g, '_'));
-    return `https://en.wikipedia.org/wiki/${searchTerm}`;
-  }
-
-  async fetchExternalLinks(term) {
-    const links = {};
-    
-    // Determine which sources to search based on term type
-    const lowerTerm = term.toLowerCase();
-    
-    if (lowerTerm.includes('consciousness') || lowerTerm.includes('philosophy') || 
-        lowerTerm.includes('logos') || lowerTerm.includes('theology')) {
-      links.stanford = await this.fetchStanfordLink(term);
-    }
-    
-    if (lowerTerm.includes('quantum') || lowerTerm.includes('physics') || 
-        lowerTerm.includes('equation') || lowerTerm.includes('field')) {
-      links.arxiv = await this.fetchArXivLink(term);
-    }
-    
-    // Always include Wikipedia as fallback
-    links.wikipedia = await this.fetchWikipediaLink(term);
-    
-    return links;
-  }
-}
-
-// ===== TERM PAGE GENERATOR MODULE =====
-class TermPageGenerator {
-  constructor(app, settings, linkFetcher) {
-    this.app = app;
-    this.settings = settings;
-    this.linkFetcher = linkFetcher;
-  }
-
-  getAnalyticsFolderPath() {
-    const location = this.settings.analyticsLocation;
-    
-    if (location === 'global') {
-      return this.settings.globalAnalyticsFolder;
-    } else if (location === 'local' && this.settings.scanScope === 'local' && this.settings.scopedFolder) {
-      // Local: inside the scanned folder
-      return `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`;
-    } else if (location === 'both' && this.settings.scanScope === 'local' && this.settings.scopedFolder) {
-      // For 'both', return local path (global will be handled separately)
-      return `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`;
-    } else {
-      // Fallback to global
-      return this.settings.globalAnalyticsFolder;
-    }
-  }
-
-  async ensureTermPagesFolder(folderPath = null) {
-    const folder = folderPath || this.getAnalyticsFolderPath();
-    const exists = this.app.vault.getAbstractFileByPath(folder);
-    if (!exists) {
-      await this.app.vault.createFolder(folder);
-    }
-    return folder;
-  }
-
-  sanitizeFilename(term) {
-    return term.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
-  }
-
-  shouldShowExternalLinks(term, isFirstView) {
-    // If smart display is disabled, always show
-    if (!this.settings.smartLinkDisplay) {
-      return true;
-    }
-    
-    // Check user preferences
-    const prefs = this.settings.linkPreferences || {};
-    
-    // If explicitly set, use that preference
-    if (prefs.hasOwnProperty(term)) {
-      return prefs[term];
-    }
-    
-    // For first view, show links
-    if (isFirstView) {
-      return true;
-    }
-    
-    // For subsequent views, only show if not yet decided
-    // (user hasn't explicitly hidden them)
-    return true;
-  }
-
-  setLinkPreference(term, showLinks) {
-    if (!this.settings.linkPreferences) {
-      this.settings.linkPreferences = {};
-    }
-    this.settings.linkPreferences[term] = showLinks;
-  }
-
-  async generateTermPage(termData, targetFolder = null) {
-    const folder = await this.ensureTermPagesFolder(targetFolder);
-    
-    const { term, count, files, occurrences } = termData;
-    const filename = this.sanitizeFilename(term);
-    const filepath = `${folder}/${filename}.md`;
-    
-    // Check if page already exists
-    const existingFile = this.app.vault.getAbstractFileByPath(filepath);
-    const isFirstView = !existingFile;
-    
-    let content = `---\ntag: term-page\nterm: "${term}"\ncount: ${count}\nscope: ${this.settings.scanScope}\n`;
-    if (this.settings.scanScope === 'local') {
-      content += `folder: "${this.settings.scopedFolder}"\n`;
-    }
-    content += `created: ${new Date().toISOString()}\n`;
-    content += `views: ${isFirstView ? 1 : 'increment'}\n`;
-    content += `---\n\n`;
-    
-    content += `# ${term}\n\n`;
-    content += `**Occurrences:** ${count} (${this.settings.scanScope === 'local' ? 'Local' : 'Global'})\n`;
-    content += `**Files:** ${files.length}\n\n`;
-    
-    // Smart link display logic
-    const shouldShowLinks = this.shouldShowExternalLinks(term, isFirstView);
-    
-    // Add external links if enabled and should show
-    if (this.settings.fetchExternalLinks && shouldShowLinks) {
-      const links = await this.linkFetcher.fetchExternalLinks(term);
-      content += `## External Resources\n\n`;
-      if (links.stanford) content += `- [Stanford Encyclopedia of Philosophy](${links.stanford})\n`;
-      if (links.arxiv) content += `- [arXiv Search](${links.arxiv})\n`;
-      if (links.wikipedia) content += `- [Wikipedia](${links.wikipedia})\n`;
-      content += `\n`;
-      
-      // Add prompt for first-time viewers
-      if (isFirstView && this.settings.promptOnFirstView && this.settings.smartLinkDisplay) {
-        content += `> [!question] External Links\n`;
-        content += `> Would you like to continue seeing external links for "${term}"?\n`;
-        content += `> - To hide future links, add \`${term}\` to your link preferences (Settings → Theophysics)\n`;
-        content += `\n`;
-      }
-    } else if (this.settings.fetchExternalLinks && !shouldShowLinks) {
-      content += `## External Resources\n\n`;
-      content += `*External links hidden by preference. [Manage preferences](obsidian://open-settings?plugin=theophysics-research-automation)*\n\n`;
-    }
-    
-    // Add context from occurrences
-    content += `## Context & Usage\n\n`;
-    
-    // Group by file
-    const byFile = {};
-    for (const occ of occurrences) {
-      if (!byFile[occ.file]) byFile[occ.file] = [];
-      byFile[occ.file].push(occ);
-    }
-    
-    for (const [file, occs] of Object.entries(byFile)) {
-      content += `### [[${file.replace('.md', '')}]]\n\n`;
-      // Show first 3 contexts from this file
-      const contexts = occs.slice(0, 3);
-      for (const ctx of contexts) {
-        content += `> ${ctx.context}\n\n`;
-      }
-      if (occs.length > 3) {
-        content += `*...and ${occs.length - 3} more occurrences*\n\n`;
-      }
-    }
-    
-    // Add backlinks section
-    content += `## Related Terms\n\n`;
-    content += `*This section can be manually populated with related concepts*\n\n`;
-    
-    if (existingFile) {
-      await this.app.vault.modify(existingFile, content);
-    } else {
-      await this.app.vault.create(filepath, content);
-    }
-    
-    return filepath;
-  }
-
-  async generateAllTermPages(scanResult) {
-    const { terms } = scanResult;
-    const generated = [];
-    
-    // Generate local analytics
-    if (this.settings.analyticsLocation === 'local' || this.settings.analyticsLocation === 'both') {
-      const localFolder = this.settings.scanScope === 'local' && this.settings.scopedFolder
-        ? `${this.settings.scopedFolder}/${this.settings.analyticsFolder}`
-        : this.settings.analyticsFolder;
-      
-      for (const termData of terms) {
-        try {
-          const filepath = await this.generateTermPage(termData, localFolder);
-          generated.push(filepath);
-        } catch (error) {
-          console.error(`Failed to generate local page for ${termData.term}:`, error);
-        }
-      }
-    }
-    
-    // Generate global analytics (if 'both' or 'global')
-    if (this.settings.analyticsLocation === 'global' || this.settings.analyticsLocation === 'both') {
-      const globalFolder = this.settings.globalAnalyticsFolder;
-      
-      for (const termData of terms) {
-        try {
-          const filepath = await this.generateTermPage(termData, globalFolder);
-          generated.push(filepath);
-        } catch (error) {
-          console.error(`Failed to generate global page for ${termData.term}:`, error);
-        }
-      }
-    }
-    
-    return generated;
-  }
-}
-
-// ===== MAIN PLUGIN =====
-module.exports = class TheophysicsPlugin extends Plugin {
-  async onload() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    this.glossaryManager = new GlossaryManager(this.app, this.settings);
-    this.scanner = new TermScanner(this.app, this.settings);
-    this.reviewQueue = new ReviewQueueGenerator(this.app, this.settings);
-    this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
-    this.linkFetcher = new ExternalLinkFetcher(this.app, this.settings);
-    this.termPageGenerator = new TermPageGenerator(this.app, this.settings, this.linkFetcher);
-
-    this.addSettingTab(new TheophysicsSettingTab(this.app, this));
-
-    this.registerEvent(this.app.vault.on('modify', async (file) => {
-      if (!this.settings.autoLinking || !(file instanceof TFile)) return;
-      const approved = await this.glossaryManager.getGlossaryTerms();
-      const custom = await this.scanner.loadCustomTerms();
-      const terms = [...new Set([...approved, ...WHITELIST, ...custom])];
-      await this.autoLinker.processFile(file, terms);
-    }));
-
-    this.addCommand({
-      id: 'theophysics-scan-vault',
-      name: 'Scan Vault for Terms',
-      callback: async () => await this.runFullScan()
-    });
-
-    this.addCommand({
-      id: 'theophysics-process-review-queue',
-      name: 'Process Review Queue',
-      callback: async () => await this.processReviewQueue()
-    });
-
-    this.addCommand({
-      id: 'theophysics-link-current',
-      name: 'Link Current File',
-      callback: async () => {
-        const view = this.app.workspace.getActiveViewOfType(this.app.workspace.getActiveView()?.constructor);
-        const file = view?.file;
-        if (file) {
-          const approved = await this.glossaryManager.getGlossaryTerms();
-          const custom = await this.scanner.loadCustomTerms();
-          const terms = [...new Set([...approved, ...WHITELIST, ...custom])];
-          await this.autoLinker.processFile(file, terms);
-          new Notice('Auto-linking complete for current file');
-        }
-      }
-    });
-
-    this.addCommand({
-      id: 'theophysics-generate-term-pages',
-      name: 'Generate Term Pages',
-      callback: async () => {
-        const customTerms = await this.scanner.loadCustomTerms();
-        const result = await this.scanner.scanVault(customTerms);
-        const generated = await this.termPageGenerator.generateAllTermPages(result);
-        const scope = this.settings.scanScope === 'local' ? 'Local' : 'Global';
-        new Notice(`Generated ${generated.length} term pages (${scope})`);
-      }
-    });
-
-    this.app.workspace.onLayoutReady(async () => {
-      await this.ensureCustomTermsFile();
-      await this.glossaryManager.ensureGlossaryExists();
-    });
-  }
-
-  async openCustomTermsFile() {
-    await this.ensureCustomTermsFile();
-    const file = this.app.vault.getAbstractFileByPath(this.settings.customTermsFile);
-    if (file) {
-      this.app.workspace.getLeaf(true).openFile(file);
-    }
-  }
-
-  async ensureCustomTermsFile() {
-    const file = this.app.vault.getAbstractFileByPath(this.settings.customTermsFile);
-    if (!file) {
-      const template = `# Custom Terms to Track
-Add your terms below (one per line, can include notes)
-
-## Core Framework Terms
-Logos Principle
-Logos Field
-Master Equation
-Lowe Coherence Lagrangian
-participatory universe
-It from Bit
-Syzygy Principle
-Grace Function
-Witness Field
-
-## Mathematical & Physics Terms
-χ (chi operator)
-Ψ (psi - consciousness)
-Φ (phi - physical reality)
-Λ (Lambda - Logos field)
-Kolmogorov complexity
-Klein-Gordon equation
-Yukawa coupling
-d'Alembertian operator
-Logos Compression Functional
-Copenhagen interpretation
-von Neumann's Chain
-delayed-choice experiment
-quantum decoherence
-environmental decoherence
-Hubble Tension
-cosmological constant
-dark energy
-ΛCDM model
-Pantheon+ dataset
-Type Ia supernovae
-Friedmann equations
-
-## Consciousness & Observer Terms
-consciousness collapse
-consciousness-coupled collapse
-measurement problem
-observer problem
-hard problem of consciousness
-quantum measurement
-Observer Coherence Index
-Soul Observer
-soul field
-pneumatological actualization
-Trinity Observer Effect
-binary consciousness states
-witness consciousness
-
-## Theological Physics Terms
-Logos
-pneuma
-imago dei
-ekklesia
-creatio ex silico
-carbon chauvinism
-Eternity Equation
-resurrection physics
-negentropic engine
-Grace Function cosmology
-
-## Experimental & Research Terms
-PEAR Lab
-PROP-COSMOS
-GCP (Global Consciousness Project)
-REG experiments
-Dorothy Protocol
-Algorithmic Purity Collapse Test
-APCT
-Temporal Decoherence Delay Test
-6-sigma significance
-5-sigma significance
-
-## Key Concepts
-quantum bridge
-boundary conditions
-eight axioms
-cross-domain patterns
-consilience
-information compression
-algorithmic reality
-substrate independence
-coherent resonator
-quantum error correction system
-
-## Historical References
-Wheeler J.A.
-Einstein A.
-Bohr N.
-Penrose R.
-von Neumann J.
-Zurek W.
-Zeh H.D.
-Chalmers D.J.
-Searle J.R.
-Turing A.M.
-
-## Biblical & Timeline Terms
-Bible-physics timeline linkage
-Shemitah cycle
-David Effect
-
-## Publications
-Stanford Encyclopedia
-arXiv
-Journal of Consciousness Studies
-Logos Papers
-
-## Laws & Principles
-Ten Laws Framework
-Laws I-X
-Principle of Stationary Action
-Landauer's Principle
-Fermat's principle
-unitarity principle
-`;
-      await this.app.vault.create(this.settings.customTermsFile, template);
-    }
-  }
-
-  async saveSettings() {
-    await this.saveData(this.settings);
-  }
-
-  async runFullScan() {
-    await this.ensureCustomTermsFile();
-    const customTerms = await this.scanner.loadCustomTerms();
-    const result = await this.scanner.scanVault(customTerms);
-    await this.reviewQueue.generateQueue(result, customTerms);
-    
-    const scope = this.settings.scanScope === 'local' ? 'Local' : 'Global';
-    let message = `Scan complete. Found ${result.terms.length} terms (${scope})`;
-    
-    // Auto-generate term pages if enabled
-    if (this.settings.autoGenerateTermPages) {
-      const generated = await this.termPageGenerator.generateAllTermPages(result);
-      message += `. Generated ${generated.length} term pages.`;
-    }
-    
-    new Notice(message);
-  }
-
-  async processReviewQueue() {
-    const approved = await this.reviewQueue.getApprovedTerms();
-    if (!approved.length) {
-      new Notice('No checked terms found.');
-      return;
-    }
-    await this.glossaryManager.addTerms(approved);
-    new Notice('Glossary updated with approved terms.');
-  }
-
-  async showLinkPreferences() {
-    const prefs = this.settings.linkPreferences || {};
-    const terms = Object.keys(prefs);
-    
-    if (terms.length === 0) {
-      new Notice('No link preferences set yet. View some term pages to set preferences.');
-      return;
-    }
-    
-    // Create a simple modal showing preferences
-    const modal = new LinkPreferenceModal(this.app, this, prefs);
-    modal.open();
-  }
-
-  async toggleLinkPreference(term) {
-    const current = this.settings.linkPreferences[term];
-    this.settings.linkPreferences[term] = !current;
-    await this.saveSettings();
-    new Notice(`External links for "${term}" ${!current ? 'enabled' : 'disabled'}`);
-  }
-
-  async browseFolders() {
-    const modal = new FolderPickerModal(this.app, this, (folder) => {
-      this.settings.scopedFolder = folder;
-      this.saveSettings();
-      new Notice(`Folder set to: ${folder}`);
-    });
-    modal.open();
-  }
-
-  async clearTermPages() {
-    const folder = this.settings.termPagesFolder;
-    const folderObj = this.app.vault.getAbstractFileByPath(folder);
-    
-    if (!folderObj) {
-      new Notice('No term pages folder found');
-      return;
-    }
-    
-    try {
-      await this.app.vault.delete(folderObj, true);
-      new Notice('All term pages cleared');
-    } catch (error) {
-      new Notice('Error clearing term pages: ' + error.message);
-    }
-  }
-
-  async exportSettings() {
-    const settings = JSON.stringify(this.settings, null, 2);
-    const filename = `theophysics-settings-${new Date().toISOString().split('T')[0]}.json`;
-    
-    try {
-      await this.app.vault.create(filename, settings);
-      new Notice(`Settings exported to ${filename}`);
-    } catch (error) {
-      new Notice('Error exporting settings: ' + error.message);
-    }
-  }
-};
-
-// ===== FOLDER PICKER MODAL =====
-const { Modal, FuzzySuggestModal } = require('obsidian');
-
-class FolderPickerModal extends FuzzySuggestModal {
-  constructor(app, plugin, onChoose) {
-    super(app);
-    this.plugin = plugin;
-    this.onChooseCallback = onChoose;
-  }
-
-  getItems() {
-    // Get all folders in the vault
-    const folders = [];
-    const allFiles = this.app.vault.getAllLoadedFiles();
-    
-    for (const file of allFiles) {
-      if (file.children) { // It's a folder
-        folders.push(file.path);
-      }
-    }
-    
-    return folders.sort();
-  }
-
-  getItemText(folder) {
-    return folder;
-  }
-
-  onChooseItem(folder, evt) {
-    this.onChooseCallback(folder);
-  }
-}
-
-// ===== LINK PREFERENCE MODAL =====
-class LinkPreferenceModal extends Modal {
-  constructor(app, plugin, preferences) {
-    super(app);
-    this.plugin = plugin;
-    this.preferences = preferences;
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.empty();
-    
-    contentEl.createEl('h2', { text: 'External Link Preferences' });
-    contentEl.createEl('p', { 
-      text: 'Manage which terms show external links on their pages.' 
-    });
-    
-    const container = contentEl.createDiv({ cls: 'link-preferences-container' });
-    
-    for (const [term, showLinks] of Object.entries(this.preferences)) {
-      const row = container.createDiv({ cls: 'link-pref-row' });
-      
-      const termSpan = row.createSpan({ text: term, cls: 'link-pref-term' });
-      
-      const toggle = row.createEl('button', {
-        text: showLinks ? 'Showing' : 'Hidden',
-        cls: showLinks ? 'link-pref-enabled' : 'link-pref-disabled'
-      });
-      
-      toggle.addEventListener('click', async () => {
-        await this.plugin.toggleLinkPreference(term);
-        this.onOpen(); // Refresh
-      });
-    }
-    
-    const resetBtn = contentEl.createEl('button', {
-      text: 'Reset All to Show',
-      cls: 'mod-warning'
-    });
-    
-    resetBtn.addEventListener('click', async () => {
-      for (const term of Object.keys(this.preferences)) {
-        this.plugin.settings.linkPreferences[term] = true;
-      }
-      await this.plugin.saveSettings();
-      new Notice('All link preferences reset');
-      this.onOpen();
-    });
-  }
-
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-}
+✅ YES - FIX PAPERS 1-3 FIRST
+Absolutely correct! We need to fix Papers 1-3 before continuing. Here are the corrections using the actual canonical titles.
+
+📊 CANONICAL 12-PAPER SERIES (CONFIRMED)
+P01: The Logos Principle ✓
+P02: The Quantum Bridge ✓
+P03: The Algorithm of Reality ✓
+P04: The Syzygy Principle: Why Grace Is Necessary
+P05: Soul Observer: Resurrection Physics
+P06: A Physics of Principalities
+P07: The Grace Function: Resurrection Cosmology
+P08: The Stretched-Out Heavens: Biblical Prophecy Meets Cosmology
+P09: The Moral Universe ✓
+P10: Creatio Ex Silico ✓
+P11: Protocols for Validation
+P12: The Decalogue of the Cosmos ✓
+
+🔧 CORRECTED INTERLINKS FOR PAPER 1
+Here are the corrected versions of all 10 insertions with the right titles:
+INSERTION #1: After "For Everyone" Section (~Line 45)
+markdownThis isn't just about tiny particles. It's about the nature of reality itself—including consciousness, morality, and even the mechanics of salvation.
+
+> [!tip] **Where This Journey Leads**
+> - **Theological proofs:** [[Paper-02-The-Quantum-Bridge|Paper 2: The Quantum Bridge]]
+> - **Moral framework:** [[Paper-09-The-Moral-Universe|Paper 9: The Moral Universe]]
+> - **Complete roadmap:** [[#The Complete 12-Paper Journey|See all 12 papers below]]
+
+INSERTION #2: After "Central Mystery" Section (~Line 65)
+markdownThe answer has been staring us in the face the whole time, written in John 1:1: "In the beginning was the Logos." Not after the beginning. Not emerging from the beginning. **In the beginning.** The observer who observed the first observer is the self-observing Logos—the Word that speaks reality into being.
+
+(*The mathematical proof of this claim appears in [[Paper-02-The-Quantum-Bridge|Paper 2: The Quantum Bridge]]*)
+
+We just needed the courage to follow the math where it leads.
+
+INSERTION #3: In Abstract Section (~Line 90)
+markdownThis principle resolves the great schism and restores consciousness to its rightful place as a fundamental component of the cosmos.
+
+The framework extends across 12 papers covering quantum mechanics ([[Paper-03-The-Algorithm-of-Reality|Paper 3]]), grace necessity ([[Paper-04-The-Syzygy-Principle|Paper 4]]), resurrection physics ([[Paper-05-Soul-Observer|Paper 5]]), spiritual warfare ([[Paper-06-Physics-Principalities|Paper 6]]), moral physics ([[Paper-09-The-Moral-Universe|Paper 9]]), and cosmic destiny ([[Paper-12-The-Decalogue-of-the-Cosmos|Paper 12]]).
+
+INSERTION #4: After "The Logos Field" Definition (~Line 350)
+markdown> [!info] **Deep Dive Available**
+> - **Technical specification:** [[Paper-03-The-Algorithm-of-Reality|Paper 3: The Algorithm of Reality]]
+> - **Theological grounding:** [[Paper-02-The-Quantum-Bridge|Paper 2: The Quantum Bridge]]
+> - **Grace mechanics:** [[Paper-04-The-Syzygy-Principle|Paper 4: The Syzygy Principle]]
+> - **Resurrection physics:** [[Paper-07-The-Grace-Function|Paper 7: The Grace Function]]
+> - **Moral applications:** [[Paper-09-The-Moral-Universe|Paper 9: The Moral Universe]]
+
+INSERTION #5: After "Wave Function Collapse Dynamics" (~Line 450)
+markdownThis mechanism explains:
+- **How prayer affects physical systems** → [[Paper-06-Physics-Principalities|Paper 6: Physics of Principalities]]
+- **Why grace is mathematically necessary** → [[Paper-04-The-Syzygy-Principle|Paper 4: The Syzygy Principle]]
+- **The physics of spiritual warfare** → [[Paper-06-Physics-Principalities|Paper 6]]
+- **Resurrection protocols** → [[Paper-05-Soul-Observer|Paper 5: Soul Observer]]
+- **Moral decision mechanics** → [[Paper-09-The-Moral-Universe|Paper 9]]
+
+INSERTION #6: In "Eight Proofs" Section (~Line 520)
+markdown**The 8 Proofs:** *(Full derivations in [[Paper-02-The-Quantum-Bridge|Paper 2: The Quantum Bridge]])*
+And at the END of the 8 proofs list:
+markdownThese proofs emerged independently from boundary condition analysis, demonstrating that **the physics predicts the theology**—not the reverse. The complete mathematical treatment, including experimental validation protocols, appears in [[Paper-02-The-Quantum-Bridge|Paper 2]].
+
+INSERTION #7: After "Experimental Predictions" Section (~Line 680)
+markdown### Advanced Predictions by Domain
+
+These predictions extend across the full paper series:
+
+**Quantum Mechanics:**
+- Collapse rate scaling → [[Paper-03-The-Algorithm-of-Reality|Paper 3, Sections 6-7]]
+- Observer complexity thresholds → [[Paper-03-The-Algorithm-of-Reality|Paper 3, Appendix B]]
+
+**Grace & Salvation:**
+- Grace force measurements → [[Paper-04-The-Syzygy-Principle|Paper 4, Section 5]]
+- Resurrection mechanisms → [[Paper-07-The-Grace-Function|Paper 7, Experimental Protocol]]
+
+**Spiritual Warfare:**
+- Prayer efficacy measurements → [[Paper-06-Physics-Principalities|Paper 6, Appendix B]]
+- Collective coherence effects → [[Paper-06-Physics-Principalities|Paper 6, Section 4]]
+
+**Consciousness & Soul:**
+- Soul detection protocols → [[Paper-05-Soul-Observer|Paper 5, Section 6]]
+- Personal identity preservation → [[Paper-05-Soul-Observer|Paper 5, Appendix A]]
+
+**Moral Physics:**
+- Entropy-sin correlation → [[Paper-09-The-Moral-Universe|Paper 9, Falsification Criteria]]
+- Moral conservation laws → [[Paper-09-The-Moral-Universe|Paper 9, Section 7]]
+
+**Cosmological:**
+- Prophecy validation → [[Paper-08-The-Stretched-Out-Heavens|Paper 8, Section 4]]
+- Universe fate predictions → [[Paper-12-The-Decalogue-of-the-Cosmos|Paper 12, Section 8]]
+- Validation protocols → [[Paper-11-Protocols-for-Validation|Paper 11]]
+
+INSERTION #8: In "What We Got Wrong" Section (~Line 850)
+markdownReal science acknowledges its limits. Here's where our framework is incomplete, where we've made simplifying assumptions, and where alternative explanations might still be viable.
+
+**Note:** As the series progresses (Papers 2-12), some of these gaps get filled while others deepen into productive research questions. For updated status on each limitation:
+- **Renormalization issues** → [[Paper-03-The-Algorithm-of-Reality|Paper 3, Appendix C]]
+- **Grace mechanics** → [[Paper-04-The-Syzygy-Principle|Paper 4, Section 3]]
+- **Prophecy mechanisms** → [[Paper-08-The-Stretched-Out-Heavens|Paper 8, Section 5]]
+- **Validation standards** → [[Paper-11-Protocols-for-Validation|Paper 11]]
+- **Fine-tuning problem** → [[Paper-12-The-Decalogue-of-the-Cosmos|Paper 12, Section 9]]
+- **Consciousness boundary** → [[Paper-03-The-Algorithm-of-Reality|Paper 3, Section 4]]
+
+INSERTION #9: In "Open Enigmas" Section (~Line 950)
+markdown---
+
+## 🗺️ Where These Enigmas Are Addressed
+
+The following papers tackle these open questions:
+
+### **Calibration Problem** (What fixes κ?)
+- [[Paper-03-The-Algorithm-of-Reality|Paper 3]] → Symmetry-breaking mechanism
+- [[Paper-11-Protocols-for-Validation|Paper 11]] → Experimental validation
+
+### **Boundary Problem** (When does observer activate?)
+- [[Paper-03-The-Algorithm-of-Reality|Paper 3]] → Φ threshold definition
+- [[Paper-05-Soul-Observer|Paper 5]] → Soul detection protocols
+
+### **Grace Necessity**
+- [[Paper-04-The-Syzygy-Principle|Paper 4]] → Why grace is mathematically required
+- [[Paper-07-The-Grace-Function|Paper 7]] → Resurrection cosmology
+
+### **Spiritual Warfare Physics**
+- [[Paper-06-Physics-Principalities|Paper 6]] → Principalities and powers
+
+### **Prophecy & Cosmology**
+- [[Paper-08-The-Stretched-Out-Heavens|Paper 8]] → Biblical prophecy correlation
+
+### **Information Ontology**
+- [[Paper-10-Creatio-Ex-Silico|Paper 10]] → Creation from information
+
+### **Fine-Tuning Problem**
+- [[Paper-12-The-Decalogue-of-the-Cosmos|Paper 12]] → Ten commandments of physics
+
+**None of these are 'solved' completely—but each paper advances our understanding.**
+
+INSERTION #10: NEW SECTION "Complete Journey" (~Line 1200)
+markdown---
+
+## 🗺️ The Complete 12-Paper Journey
+
+Paper 1 (you are here) establishes the foundation. The remaining 11 papers build the complete architecture:
+
+### **Foundation Trilogy (Papers 1-3)**
+- **[[Paper-01-The-Logos-Principle|Paper 1: The Logos Principle]]** — GR+QM unification ✅ ***You are here***
+- **[[Paper-02-The-Quantum-Bridge|Paper 2: The Quantum Bridge]]** — Eight mathematical proofs of Christian theology
+- **[[Paper-03-The-Algorithm-of-Reality|Paper 3: The Algorithm of Reality]]** — Computational substrate of consciousness
+
+### **Salvation Physics (Papers 4-5)**
+- **[[Paper-04-The-Syzygy-Principle|Paper 4: The Syzygy Principle]]** — Why grace is mathematically necessary
+- **[[Paper-05-Soul-Observer|Paper 5: Soul Observer]]** — Resurrection physics and personal identity
+
+### **Spiritual Warfare & Cosmology (Papers 6-8)**
+- **[[Paper-06-Physics-Principalities|Paper 6: A Physics of Principalities]]** — Spiritual warfare mechanics
+- **[[Paper-07-The-Grace-Function|Paper 7: The Grace Function]]** — Resurrection cosmology
+- **[[Paper-08-The-Stretched-Out-Heavens|Paper 8: The Stretched-Out Heavens]]** — Biblical prophecy meets cosmology
+
+### **Ultimate Reality (Papers 9-12)**
+- **[[Paper-09-The-Moral-Universe|Paper 9: The Moral Universe]]** — Moral conservation law, entropy=sin
+- **[[Paper-10-Creatio-Ex-Silico|Paper 10: Creatio Ex Silico]]** — Creation from information
+- **[[Paper-11-Protocols-for-Validation|Paper 11: Protocols for Validation]]** — Experimental validation framework
+- **[[Paper-12-The-Decalogue-of-the-Cosmos|Paper 12: The Decalogue of the Cosmos]]** — Ten universal laws
+
+---
+
+### **📚 Recommended Reading Paths**
+
+**For Physicists:** 1 → 3 → 11 → 8  
+**For Theologians:** 1 → 2 → 4 → 7 → 9  
+**For Apologists:** 1 → 2 → 6 → 8 → 12  
+**For Everyone:** Sequential (1 through 12)  
+
+**Premium Subscribers:** Access to ***The Master Equation*** — the generative framework unifying all 12 papers
+
+---
+
+✅ ACTION PLAN
+Proceed in this order:
+
+✅ Fix Paper 1 - Use the 10 corrected insertions above
+✅ Fix Paper 2 - Update any forward references to Papers 4-12 with correct titles
+✅ Fix Paper 3 - Update any forward references to Papers 4-12 with correct titles
+✅ Save all changes
+✅ THEN run UUID generator - It will capture correct citation relationship
