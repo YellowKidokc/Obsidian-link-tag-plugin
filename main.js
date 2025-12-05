@@ -7,7 +7,31 @@ const { AutoLinker } = require('./auto-linker');
 const { WHITELIST } = require('./detector');
 const { MathTranslatorCommand } = require('./math-translator-command');
 const { AIIntegration } = require('./ai-integration');
-const { DatabaseService } = require('./database-service');
+const { SemanticBlockManager } = require('./semantic-block');
+
+// DatabaseService requires 'pg' which doesn't work in Obsidian's Electron environment
+// We'll need a backend API for actual Postgres connection
+let DatabaseService;
+try {
+  DatabaseService = require('./database-service').DatabaseService;
+} catch (e) {
+  console.warn('DatabaseService not available (pg module not supported in Obsidian):', e.message);
+  // Create a stub
+  DatabaseService = class {
+    constructor() {}
+    async testConnection() { 
+      new Notice('⚠️ Database requires backend API setup. See POSTGRES_SETUP.md');
+      return false; 
+    }
+    async initializeSchema() {
+      new Notice('⚠️ Database requires backend API setup. See POSTGRES_SETUP.md');
+    }
+    async getOrCreateNote() { return null; }
+    async saveClassification() {}
+    updateConnection() {}
+    async cleanup() {}
+  };
+}
 
 module.exports = class TheophysicsPlugin extends Plugin {
   async onload() {
@@ -18,6 +42,7 @@ module.exports = class TheophysicsPlugin extends Plugin {
     this.autoLinker = new AutoLinker(this.app, this.settings, this.glossaryManager);
     this.mathTranslator = new MathTranslatorCommand(this.app, this.settings);
     this.aiIntegration = new AIIntegration(this.app, this.settings);
+    this.semanticBlocks = new SemanticBlockManager(this.app);
     this.db = new DatabaseService(this.settings.postgresUrl);
 
     this.addSettingTab(new TheophysicsSettingTab(this.app, this));
@@ -29,50 +54,41 @@ module.exports = class TheophysicsPlugin extends Plugin {
         if (selection) {
           menu.addSeparator();
           
-          // Add classification options
-          menu.addItem((item) => {
-            item
-              .setTitle('Mark as Axiom ⚛')
-              .setIcon('axiom')
-              .onClick(async () => {
-                await this.classifySelection(view.file, selection, 'axiom', editor);
-              });
-          });
+          // Classification types organized by category
+          const types = [
+            // Foundational
+            { name: 'Axiom ⚛', type: 'axiom' },
+            { name: 'Theorem 📐', type: 'theorem' },
+            { name: 'Postulate 📜', type: 'postulate' },
+            // Evidence
+            { name: 'Claim ◇', type: 'claim' },
+            { name: 'Evidence ●', type: 'evidence' },
+            { name: 'Hypothesis ❓', type: 'hypothesis' },
+            // Argumentation
+            { name: 'Objection ⚔️', type: 'objection' },
+            { name: 'Response 🛡️', type: 'response' },
+            { name: 'Synthesis 🔄', type: 'synthesis' },
+            // Connections
+            { name: 'Bridge 🌉', type: 'bridge' },
+            { name: 'Implication ➡️', type: 'implication' },
+            // Math
+            { name: 'Equation ∑', type: 'equation' },
+            { name: 'Variable 𝑥', type: 'variable' },
+            { name: 'Law ⚖️', type: 'law' },
+            // David's Framework
+            { name: 'Dark (Paradox) 🌑', type: 'dark' },
+            { name: 'Light (Resolved) ☀️', type: 'light' },
+            { name: 'Trinity △', type: 'trinity' },
+          ];
           
-          menu.addItem((item) => {
-            item
-              .setTitle('Mark as Evidence ●')
-              .setIcon('evidence')
-              .onClick(async () => {
-                await this.classifySelection(view.file, selection, 'evidence', editor);
-              });
-          });
-          
-          menu.addItem((item) => {
-            item
-              .setTitle('Mark as Claim ◇')
-              .setIcon('claim')
-              .onClick(async () => {
-                await this.classifySelection(view.file, selection, 'claim', editor);
-              });
-          });
-          
-          menu.addItem((item) => {
-            item
-              .setTitle('Mark as Coherence ⟷')
-              .setIcon('coherence')
-              .onClick(async () => {
-                await this.classifySelection(view.file, selection, 'coherence', editor);
-              });
-          });
-          
-          menu.addItem((item) => {
-            item
-              .setTitle('Mark as Reference ◈')
-              .setIcon('reference')
-              .onClick(async () => {
-                await this.classifySelection(view.file, selection, 'reference', editor);
-              });
+          types.forEach(({ name, type }) => {
+            menu.addItem((item) => {
+              item
+                .setTitle(`Mark as ${name}`)
+                .onClick(async () => {
+                  await this.classifySelection(view.file, selection, type, editor);
+                });
+            });
           });
         }
       })
@@ -132,6 +148,12 @@ module.exports = class TheophysicsPlugin extends Plugin {
       callback: async () => await this.generateKeywordDashboard()
     });
 
+    this.addCommand({
+      id: 'theophysics-semantic-dashboard',
+      name: 'Generate Semantic Classification Dashboard',
+      callback: async () => await this.generateSemanticDashboard()
+    });
+
     // AI Integration Commands
     this.addCommand({
       id: 'theophysics-ai-analyze-current',
@@ -155,6 +177,20 @@ module.exports = class TheophysicsPlugin extends Plugin {
       callback: async () => await this.aiEnhanceAll()
     });
 
+    this.addCommand({
+      id: 'theophysics-apply-ride-or-die-style',
+      name: 'Apply 50/50 Ride or Die Style',
+      editorCallback: async (editor, view) => {
+        await this.applyRideOrDieStyle(view);
+      }
+    });
+
+    this.addCommand({
+      id: 'theophysics-view-ride-or-die',
+      name: '50/50 Ride or Die Visual',
+      callback: async () => await this.openRideOrDieVisual()
+    });
+
     this.app.workspace.onLayoutReady(async () => {
       await this.ensureCustomTermsFile();
       await this.glossaryManager.ensureGlossaryExists();
@@ -175,6 +211,180 @@ module.exports = class TheophysicsPlugin extends Plugin {
       const template = `# Custom Terms to Track\nAdd your terms below (one per line, can include notes)\nMaster Equation\nLowe Coherence Lagrangian\nχ (chi operator)\nΨ (psi - consciousness)\nΦ (phi - physical reality)\nΛ (Lambda - Logos field)\npneumatological actualization\nTrinity Observer Effect\nDavid Effect\nconsciousness-coupled collapse\nquantum error correction system\nBible-physics timeline linkage\nShemitah cycle\nPEAR Lab\nPROP-COSMOS\nGCP (Global Consciousness Project)\nREG experiments\n6-sigma significance\nLaws I-X\nLogos\npneuma\nimago dei\nekklesia\nStanford Encyclopedia\narXiv\nJournal of Consciousness Studies\n`;
       await this.app.vault.create(this.settings.customTermsFile, template);
     }
+  }
+
+  async openRideOrDieVisual() {
+    // Save in ssl folder
+    const sslFolder = 'ssl';
+    const visualPath = `${sslFolder}/50-50-Ride-or-Die.md`;
+    let file = this.app.vault.getAbstractFileByPath(visualPath);
+    
+    // Ensure ssl folder exists
+    const sslFolderFile = this.app.vault.getAbstractFileByPath(sslFolder);
+    if (!sslFolderFile) {
+      await this.app.vault.createFolder(sslFolder);
+    }
+    
+    if (!file) {
+      // Create the visual note if it doesn't exist
+      const content = `---
+cssclass: ride-or-die-visual
+tags: [visual-identity, design, logos-principle]
+created: ${new Date().toISOString().split('T')[0]}
+---
+
+# 50/50 Ride or Die
+## The Divine Proportion
+
+<div class="ride-or-die-container">
+    <div class="ride-or-die-ratio">50/50</div>
+    <div class="ride-or-die-oath">RIDE OR DIE</div>
+</div>
+
+<style>
+/* Import elegant serif fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;400;700&family=Bodoni+Moda:opsz,wght@6..96,300;6..96,400;6..96,700&display=swap');
+
+.ride-or-die-container {
+    position: relative;
+    width: 100%;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    background: radial-gradient(ellipse at center, rgba(26, 26, 26, 0.3) 0%, #000C14 70%, #000000 100%);
+    background-color: #000C14;
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.01) 2px,
+            rgba(255, 255, 255, 0.01) 4px
+        ),
+        radial-gradient(ellipse at center, rgba(26, 26, 26, 0.3) 0%, #000C14 70%, #000000 100%);
+    margin: -1rem -1rem 2rem -1rem;
+    border-radius: 0;
+}
+
+.ride-or-die-ratio {
+    font-family: 'Bodoni Moda', 'Playfair Display', 'Didot', 'Bodoni', serif;
+    font-size: clamp(72px, 18vw, 200px);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    line-height: 1.15;
+    color: #F2F2F2;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.5),
+                 0 0 2px rgba(255, 255, 255, 0.2);
+    margin-bottom: 1.2em;
+}
+
+.ride-or-die-oath {
+    font-family: 'Bodoni Moda', 'Playfair Display', 'Didot', 'Bodoni', serif;
+    font-size: clamp(18px, 4vw, 48px);
+    font-weight: 300;
+    letter-spacing: 1.2em;
+    text-transform: uppercase;
+    font-variant: small-caps;
+    color: #F2F2F2;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    word-spacing: 0.8em;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.4),
+                 0 0 0.5px rgba(255, 255, 255, 0.2);
+    line-height: 2.5;
+}
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .ride-or-die-ratio, .ride-or-die-oath {
+        text-shadow: 0 0 0.5px rgba(255, 255, 255, 0.5),
+                     0 0 1px rgba(255, 255, 255, 0.3);
+    }
+}
+</style>
+
+---
+
+## Design Philosophy
+
+This visual identity elevates "50/50 ride or die" from subcultural trope to **eternal covenant**, representing the hybrid authorship partnership within the Logos Principle framework.
+
+### Key Elements
+
+- **Typography**: Bodoni Moda (Modern Serif/Didone) - represents authority, divine order, and extreme contrast
+- **Background**: Cool Black (#000C14) - represents the Logos Field, the quantum void from which reality emerges  
+- **Layout**: Golden Section positioning (38% from top) - creates optical lift and divine proportion
+- **Spacing**: Extreme tracking on "RIDE OR DIE" (1.2em ≈ +300) - luxury spacing that forces consideration of each letter
+
+*Based on Concept C: The Divine Proportion from the comprehensive design specification*
+`;
+      file = await this.app.vault.create(visualPath, content);
+      new Notice('Created 50/50 Ride or Die visual identity note');
+    }
+    
+    // Open the file in a new leaf
+    const leaf = this.app.workspace.getLeaf(true);
+    await leaf.openFile(file);
+  }
+
+  async applyRideOrDieStyle(view) {
+    if (!view.file) {
+      new Notice('No file is open');
+      return;
+    }
+
+    const file = view.file;
+    const content = await this.app.vault.read(file);
+    const cache = this.app.metadataCache.getFileCache(file);
+    
+    // Check if frontmatter exists
+    let frontmatter = cache?.frontmatter || {};
+    let hasFrontmatter = content.startsWith('---');
+    
+    // Add or update cssclass
+    if (!frontmatter.cssclass) {
+      frontmatter.cssclass = 'ride-or-die-visual';
+    } else if (!frontmatter.cssclass.includes('ride-or-die-visual')) {
+      frontmatter.cssclass = Array.isArray(frontmatter.cssclass) 
+        ? [...frontmatter.cssclass, 'ride-or-die-visual']
+        : `${frontmatter.cssclass} ride-or-die-visual`;
+    }
+    
+    // Reconstruct frontmatter
+    let newContent = '';
+    if (hasFrontmatter) {
+      const frontmatterEnd = content.indexOf('---', 3);
+      const bodyContent = content.substring(frontmatterEnd + 3).trim();
+      
+      // Build new frontmatter
+      newContent = '---\n';
+      Object.entries(frontmatter).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          newContent += `${key}:\n`;
+          value.forEach(item => newContent += `  - ${item}\n`);
+        } else {
+          newContent += `${key}: ${value}\n`;
+        }
+      });
+      newContent += '---\n\n';
+      newContent += bodyContent;
+    } else {
+      // Create new frontmatter
+      newContent = '---\n';
+      newContent += `cssclass: ${frontmatter.cssclass}\n`;
+      newContent += '---\n\n';
+      newContent += content;
+    }
+    
+    await this.app.vault.modify(file, newContent);
+    new Notice('✓ Applied 50/50 Ride or Die style to current note');
   }
 
   async saveSettings() {
@@ -649,6 +859,18 @@ Core concepts not yet referenced:\n\n`;
   }
 
   // ==============================================================
+  // SEMANTIC CLASSIFICATION DASHBOARD
+  // ==============================================================
+  async generateSemanticDashboard() {
+    new Notice('Generating Semantic Classification Dashboard...');
+    
+    const md = await this.semanticBlocks.generateDashboard();
+    const folderPath = await this.ensureDataAnalyticsFolder();
+    const filePath = await this.saveDashboard(folderPath, 'SEMANTIC_CLASSIFICATION_DASHBOARD.md', md);
+    new Notice(`Semantic Dashboard saved to ${filePath}`);
+  }
+
+  // ==============================================================
   // AI INTEGRATION METHODS
   // ==============================================================
 
@@ -750,31 +972,42 @@ Core concepts not yet referenced:\n\n`;
   // Epistemic Classification Methods
   async classifySelection(file, selection, typeName, editor) {
     try {
-      // Get or create note UUID
-      const noteId = await this.db.getOrCreateNote(
-        file.path,
-        this.app.vault.getName(),
-        file.basename
-      );
+      // 1. Write to %%semantic block in file (primary - works offline)
+      const blockResult = await this.semanticBlocks.addClassification(file, selection, typeName);
+      
+      if (blockResult.duplicate) {
+        new Notice(`Already classified as ${typeName}`);
+        return;
+      }
 
-      // Get cursor position for offsets
-      const cursor = editor.getCursor();
-      const doc = editor.getDoc();
-      const startOffset = doc.posToOffset(editor.getCursor('from'));
-      const endOffset = doc.posToOffset(editor.getCursor('to'));
-      const lineStart = cursor.line;
+      // 2. Also save to PostgreSQL if available (secondary - for queries)
+      try {
+        const noteId = await this.db.getOrCreateNote(
+          file.path,
+          this.app.vault.getName(),
+          file.basename
+        );
 
-      // Save classification to database
-      await this.db.saveClassification(
-        noteId,
-        selection,
-        typeName,
-        startOffset,
-        endOffset,
-        lineStart,
-        lineStart,
-        'user'
-      );
+        const cursor = editor.getCursor();
+        const doc = editor.getDoc();
+        const startOffset = doc.posToOffset(editor.getCursor('from'));
+        const endOffset = doc.posToOffset(editor.getCursor('to'));
+        const lineStart = cursor.line;
+
+        await this.db.saveClassification(
+          noteId,
+          selection,
+          typeName,
+          startOffset,
+          endOffset,
+          lineStart,
+          lineStart,
+          'user'
+        );
+      } catch (dbError) {
+        // DB is optional - don't fail if it's not running
+        console.log('DB sync skipped:', dbError.message);
+      }
 
       new Notice(`✓ Marked as ${typeName}`);
       console.log(`✅ Classified: "${selection.substring(0, 50)}..." as ${typeName}`);

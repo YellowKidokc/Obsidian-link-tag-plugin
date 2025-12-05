@@ -146,6 +146,34 @@ class TheophysicsSettingTab extends PluginSettingTab {
 
     containerEl.createEl('h2', { text: 'General Settings' });
     
+    // 50/50 Ride or Die Style Section
+    containerEl.createEl('h3', { text: '🎨 Visual Identity' });
+    new Setting(containerEl)
+      .setName('50/50 Ride or Die Style')
+      .setDesc('Apply the elegant visual identity style to your current note')
+      .addButton(button => button
+        .setButtonText('Apply to Current Note')
+        .setCta()
+        .onClick(async () => {
+          const view = this.app.workspace.getActiveViewOfType(this.app.workspace.getActiveView()?.constructor);
+          if (view && view.file) {
+            await this.plugin.applyRideOrDieStyle(view);
+          } else {
+            new Notice('Please open a note first');
+          }
+        }));
+    
+    new Setting(containerEl)
+      .setName('View Visual Identity')
+      .setDesc('Open the full 50/50 Ride or Die visual identity note')
+      .addButton(button => button
+        .setButtonText('Open Visual Note')
+        .onClick(async () => {
+          await this.plugin.openRideOrDieVisual();
+        }));
+    
+    containerEl.createEl('hr');
+    
     new Setting(containerEl)
       .setName('Auto-linking')
       .setDesc('Automatically link detected terms to glossary entries on file save')

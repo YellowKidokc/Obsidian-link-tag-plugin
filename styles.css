@@ -67,3 +67,97 @@
 .theophysics-tab-content {
   padding-top: 10px;
 }
+
+/* ==============================================================
+   50/50 RIDE OR DIE - Visual Identity Styles
+   Based on Concept C: The Divine Proportion
+   ============================================================== */
+
+/* Import elegant serif fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;400;700&family=Bodoni+Moda:opsz,wght@6..96,300;6..96,400;6..96,700&display=swap');
+
+.ride-or-die-container {
+    /* Golden Section positioning - 38% from top creates optical lift */
+    position: relative;
+    width: 100%;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    
+    /* Cool Black background - evoking deep space and quantum void */
+    background: radial-gradient(ellipse at center, rgba(26, 26, 26, 0.3) 0%, #000C14 70%, #000000 100%);
+    background-color: #000C14;
+    
+    /* Fine film grain for quantum fluctuation aesthetic */
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 255, 255, 0.01) 2px,
+            rgba(255, 255, 255, 0.01) 4px
+        ),
+        radial-gradient(ellipse at center, rgba(26, 26, 26, 0.3) 0%, #000C14 70%, #000000 100%);
+    
+    margin: -1rem -1rem 2rem -1rem;
+    border-radius: 0;
+}
+
+.ride-or-die-ratio {
+    /* "50/50" - treated as sculpture, extreme elegance */
+    font-family: 'Bodoni Moda', 'Playfair Display', 'Didot', 'Bodoni', serif;
+    font-size: clamp(72px, 18vw, 200px);
+    font-weight: 300; /* Light weight to counter irradiation effect */
+    letter-spacing: 0.08em; /* Generous tracking for luxury - numbers breathe */
+    line-height: 1.15;
+    color: #F2F2F2; /* Soft White - 90% opacity equivalent for comfort */
+    
+    /* Critical font smoothing for elegant rendering on dark backgrounds */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    
+    /* Subtle white glow - emergence from Logos Field */
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.5),
+                 0 0 2px rgba(255, 255, 255, 0.2);
+    
+    margin-bottom: 1.2em; /* Generous spacing between ratio and oath */
+}
+
+.ride-or-die-oath {
+    /* "RIDE OR DIE" - small-caps with extreme tracking (+300) */
+    font-family: 'Bodoni Moda', 'Playfair Display', 'Didot', 'Bodoni', serif;
+    font-size: clamp(18px, 4vw, 48px);
+    font-weight: 300; /* Lighter weight to counter irradiation */
+    letter-spacing: 1.2em; /* Extreme tracking - forces consideration of each letter */
+    text-transform: uppercase;
+    font-variant: small-caps;
+    color: #F2F2F2;
+    
+    /* Critical font smoothing */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    
+    /* Additional spacing for the "air" of elegance */
+    word-spacing: 0.8em;
+    
+    /* Subtle glow - inner emission from Logos Field */
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.4),
+                 0 0 0.5px rgba(255, 255, 255, 0.2);
+    
+    /* Generous leading - luxury spacing */
+    line-height: 2.5;
+}
+
+/* High DPI display optimization */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .ride-or-die-ratio, .ride-or-die-oath {
+        text-shadow: 0 0 0.5px rgba(255, 255, 255, 0.5),
+                     0 0 1px rgba(255, 255, 255, 0.3);
+    }
+}
