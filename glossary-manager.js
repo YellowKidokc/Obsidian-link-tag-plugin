@@ -1,3 +1,5 @@
+const { rankExternalLinks } = require('./external-linker');
+
 class GlossaryManager {
   constructor(app, settings) {
     this.app = app;
@@ -14,7 +16,15 @@ class GlossaryManager {
 
   generateStub(term, count, files) {
     const usedIn = files.length ? `Used in: ${files.join(', ')}` : 'Used in: (pending scan)';
-    return `## ${term}\n${usedIn}\nFrequency: ${count} occurrences\nBrief: [Add short description]\nFull Definition: [To be expanded]\nExternal Links:\n- \n`;
+    const links = this.settings.linkToExternal
+      ? rankExternalLinks(term, this.settings.externalSources, 3)
+      : [];
+
+    const externalLinksSection = links.length
+      ? links.map(link => `- [${link.name}](${link.url})`).join('\n')
+      : '- [Add external references]';
+
+    return `## ${term}\n${usedIn}\nFrequency: ${count} occurrences\nBrief: [Add short description]\nFull Definition: [To be expanded]\nExternal Links:\n${externalLinksSection}\n`;
   }
 
   async addTerms(terms) {
@@ -23,7 +33,9 @@ class GlossaryManager {
     const content = await this.app.vault.read(file);
     let updated = content;
     for (const term of terms) {
-      if (!content.includes(`## ${term}`)) {
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const exists = new RegExp(`^##\\s+${escaped}\\s*$`, 'm').test(content);
+      if (!exists) {
         updated += '\n' + this.generateStub(term, 0, []);
       }
     }

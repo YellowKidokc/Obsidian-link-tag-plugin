@@ -7,6 +7,7 @@ An Obsidian plugin that automatically detects, links, and manages key terms acro
 - **Review Queue**: generates `_term_review_queue.md` grouped by confidence and highlighting custom terms.
 - **Auto-Linker**: links approved/whitelisted terms to the central glossary on file save.
 - **Glossary Manager**: ensures `Theophysics_Glossary.md` exists and creates stub entries for approved terms.
+- **External source ranking**: glossary stubs can auto-suggest ranked links (Stanford Encyclopedia/IEP/arXiv first, Wikipedia fallback).
 - **Definition Maintenance Mode**: scan only the configured Definitions folder to focus on glossary upkeep.
 - **Definition Dashboard**: generates `Definition_Dashboard.md` with coverage, missing items, and pending review queue stats.
 - **Custom Terms**: user-managed `Theophysics_Custom_Terms.md` merged with auto-detected terms during scans.
@@ -17,6 +18,7 @@ An Obsidian plugin that automatically detects, links, and manages key terms acro
 3. Check boxes for terms you want in the glossary and run **Process Review Queue**.
 4. Auto-linking will annotate files on save; use **Link Current File** to process manually.
 5. Use **Definition Maintenance Mode (Definitions folder only)** to re-scan only the `Definitions` directory and refresh the Definition Dashboard.
+6. Enable **Link to external sources** in settings to have glossary stubs include prioritized reference links.
 
 ## Files
 - `manifest.json` – Obsidian plugin metadata.

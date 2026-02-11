@@ -13,6 +13,36 @@ const DEFAULT_SETTINGS = {
   flagUndefined: true,
   showUsageCount: true,
   postgresSync: false,
+  externalSources: [
+    {
+      id: 'stanford-encyclopedia',
+      name: 'Stanford Encyclopedia of Philosophy',
+      baseUrl: 'https://plato.stanford.edu/search/searcher.py?query=',
+      keywords: ['philosophy', 'metaphysics', 'ethics', 'logic', 'ontology'],
+      priority: 1
+    },
+    {
+      id: 'internet-encyclopedia',
+      name: 'Internet Encyclopedia of Philosophy',
+      baseUrl: 'https://iep.utm.edu/?s=',
+      keywords: ['philosophy', 'theology', 'epistemology', 'history'],
+      priority: 2
+    },
+    {
+      id: 'arxiv',
+      name: 'arXiv',
+      baseUrl: 'https://arxiv.org/search/?searchtype=all&query=',
+      keywords: ['quantum', 'physics', 'relativity', 'lagrangian', 'equation'],
+      priority: 3
+    },
+    {
+      id: 'wikipedia',
+      name: 'Wikipedia',
+      baseUrl: 'https://en.wikipedia.org/wiki/Special:Search?search=',
+      keywords: [],
+      priority: 4
+    }
+  ],
   minFrequency: 3,
   customTerms: [],
   customTermsFile: 'Theophysics_Custom_Terms.md',
@@ -56,6 +86,16 @@ class TheophysicsSettingTab extends PluginSettingTab {
             this.plugin.settings.minFrequency = num;
             await this.plugin.saveSettings();
           }
+        }));
+
+    new Setting(containerEl)
+      .setName('Link to external sources')
+      .setDesc('Add ranked external reference links to glossary entries (Wikipedia used as fallback)')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.linkToExternal)
+        .onChange(async (value) => {
+          this.plugin.settings.linkToExternal = value;
+          await this.plugin.saveSettings();
         }));
 
     new Setting(containerEl)
